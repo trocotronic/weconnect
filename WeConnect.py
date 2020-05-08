@@ -281,7 +281,7 @@ class WeConnect():
         jr = self.__command('/-/rts/get-trip-statistics')
         return jr['rtsViewModel'] 
     
-    def search_vechiles(self):
+    def search_vehicles(self):
         self.__check_dashboard()
         jr = self.__command('/-/profile/search-vehicles', dashboard=self.__edit_profile_url)
         return jr['vehicleList'] 
