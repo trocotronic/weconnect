@@ -126,8 +126,15 @@ class WeConnect():
             if (not form):
                 form = soup.find('form', {'id': 'emailPasswordForm'})
                 if (form):
-                    div = form.find('div', {'class': 'sub-title'}).find('div').text
-                    raise UrlError(r.status_code, div, r)
+                    span = form.find('span', { 'class': 'message'})
+                    e = 'Cannot login. Unknown error.'
+                    if (span):
+                        e = span.text
+                    else:
+                        div = form.find('div', {'class': 'sub-title'})
+                        if (div):
+                            e = div.text
+                    raise UrlError(r.status_code, e, r)
                 raise UrlError(r.status_code, 'This account does not exist', r)
             form_url = form['action']
             hiddn = form.find_all('input', {'type': 'hidden'})
