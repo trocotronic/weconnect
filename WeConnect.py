@@ -5,10 +5,6 @@ Created on Thu May  7 10:39:56 2020
 @author: Trocotronic
 
 """
-
-COUNTRY_CODE = 'es_ES'
-
-
 class VWError(Exception):
     def __init__(self, message):
         self.message = message
@@ -48,7 +44,6 @@ class WeConnect():
         if ('application/json' in r.headers['Content-Type']):
             jr = r.json()
             if (jr['errorCode'] != '0'):
-                print((r.request.body))
                 raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
             return jr
         return r
@@ -84,10 +79,7 @@ class WeConnect():
                 rj = r.json()
                 if (rj['errorCode'] != '0'):
                     raise UrlError(r.status_code, "get-country error", r)
-                
-                if (not COUNTRY_CODE):
-                    print('Please, select language:\n')
-                
+                              
                 countries = {}
                 for lang in rj['countries']:
                     for (loc,disp) in lang['languages'].items():
@@ -113,6 +105,7 @@ class WeConnect():
                 r =  self.__get_url(cn_url, post={cn_namespace+'country': lcod[1].lower(), cn_namespace+'language': lcod[0]})
                 
                 soup = BeautifulSoup(r.text, 'html.parser')
+                
             cn_welcome = soup.find('cn-welcome-view')
             cn_w_url = cn_welcome['cn-login-url']
             
@@ -124,17 +117,15 @@ class WeConnect():
             post = {}
             for h in hiddn:
                 post[h['name']] = h['value']
-            post['email'] = USER
+            post['email'] = user
             
             upr = urlparse(r.url)
-            
             r =  self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
             soup = BeautifulSoup(r.text, 'html.parser')
             form = soup.find('form', {'id': 'credentialsForm'})
             if (not form):
                 form = soup.find('form', {'id': 'emailPasswordForm'})
                 if (form):
-                    print(form)
                     div = form.find('div', {'class': 'sub-title'}).find('div').text
                     raise UrlError(r.status_code, div, r)
                 raise UrlError(r.status_code, 'This account does not exist', r)
@@ -143,7 +134,7 @@ class WeConnect():
             post = {}
             for h in hiddn:
                 post[h['name']] = h['value']
-            post['password'] = PASSWORD
+            post['password'] = password
             
             upr = urlparse(r.url)
             r =  self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
