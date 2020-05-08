@@ -8,25 +8,25 @@ This modules contains some of the methods to interact with Volkswagen's service 
 - Direct login with the same USER and PASSWORD you use.
 - Session is stored to prevent massive logins.
 - Available methods:
--- logout
--- get_fully_loaded_cars
--- get_location
--- get_fences
--- get_alerts
--- get_psp_tile_status
--- get_shutdown
--- load_car_details
--- get_expired_placeids
--- get_psp_status
--- get_vehicle_details
--- get_latest_report
--- get_latest_trip_statistics
--- get_vsr
--- get_preferred_dealer
--- get_last_refuel_trip_statistics
--- get_trip_statistics
--- search_vehicles
--- get_trusted_device_status
+  - logout
+  - get_fully_loaded_cars
+  - get_location
+  - get_fences
+  - get_alerts
+  - get_psp_tile_status
+  - get_shutdown
+  - load_car_details
+  - get_expired_placeids
+  - get_psp_status
+  - get_vehicle_details
+  - get_latest_report
+  - get_latest_trip_statistics
+  - get_vsr
+  - get_preferred_dealer
+  - get_last_refuel_trip_statistics
+  - get_trip_statistics
+  - search_vehicles
+  - get_trusted_device_status
 
 ## Usage
 
