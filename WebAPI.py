@@ -299,7 +299,7 @@ class WeConnect():
     def get_trusted_device_status(self, vin):
         self.__check_dashboard()
         jr = self.__command('/-/profile/digitalkey/get-trusted-device-status/'+vin, dashboard=self.__edit_profile_url)
-        return jr['vehicleList'] 
+        return jr['trustedDeviceStatus'] 
     
     def get_emanager(self):
         self.__check_dashboard()
