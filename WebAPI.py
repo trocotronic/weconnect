@@ -44,7 +44,10 @@ class WeConnect():
         if ('application/json' in r.headers['Content-Type']):
             jr = r.json()
             if (jr['errorCode'] != '0'):
-                raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
+                if ('errorType' in jr):
+                    raise VWError('JSON Response with error = {} ({})'.format(jr['errorCode'], jr['errorType']))
+                else:
+                    raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
             return jr
         return r
     
