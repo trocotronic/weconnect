@@ -310,4 +310,21 @@ class WeConnect():
         self.__check_dashboard()
         jr = self.__command('/-/rah/get-status')
         return jr['remoteAuxiliaryHeating'] 
+    
+    def request_vsr(self):
+        self.__check_dashboard()
+        self.__command('/-/vsr/request-vsr')
+    
+    def set_climatisation(self, action='off'):
+        self.__check_dashboard()
+        self.__command('/-/emanager/trigger-climatisation', post={ 'triggerAction' : True if action.lower() == 'on' else False, 'electricClima' : True })
         
+    def set_charge(self, action='off'):
+        self.__check_dashboard()
+        self.__command('/-/emanager/charge-battery', post={ 'triggerAction' : True if action.lower() == 'on' else False, 'batteryPercent' : 100 if action.lower() == 'on' else 99 })
+        
+    def set_window_melt(self, action='off'):
+        self.__check_dashboard()
+        self.__command('/-/emanager/trigger-windowheating', post={ 'triggerAction' : True if action.lower() == 'on' else False })
+        
+    
