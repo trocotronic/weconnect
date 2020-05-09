@@ -44,10 +44,7 @@ class WeConnect():
         if ('application/json' in r.headers['Content-Type']):
             jr = r.json()
             if (jr['errorCode'] != '0'):
-                if ('errorType' in jr):
-                    raise VWError('JSON Response with error = {} ({})'.format(jr['errorCode'], jr['errorType']))
-                else:
-                    raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
+                raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
             return jr
         return r
     
@@ -299,7 +296,7 @@ class WeConnect():
     def get_trusted_device_status(self, vin):
         self.__check_dashboard()
         jr = self.__command('/-/profile/digitalkey/get-trusted-device-status/'+vin, dashboard=self.__edit_profile_url)
-        return jr['trustedDeviceStatus'] 
+        return jr['vehicleList'] 
     
     def get_emanager(self):
         self.__check_dashboard()
@@ -310,27 +307,4 @@ class WeConnect():
         self.__check_dashboard()
         jr = self.__command('/-/rah/get-status')
         return jr['remoteAuxiliaryHeating'] 
-    
-    def request_vsr(self):
-        self.__check_dashboard()
-        self.__command('/-/vsr/request-vsr')
-    
-    def set_climatisation(self, action='off'):
-        self.__check_dashboard()
-        self.__command('/-/emanager/trigger-climatisation', post={ 'triggerAction' : True if action.lower() == 'on' else False, 'electricClima' : True })
         
-    def set_charge(self, action='off'):
-        self.__check_dashboard()
-        self.__command('/-/emanager/charge-battery', post={ 'triggerAction' : True if action.lower() == 'on' else False, 'batteryPercent' : 100 if action.lower() == 'on' else 99 })
-        
-    def set_window_melt(self, action='off'):
-        self.__check_dashboard()
-        self.__command('/-/emanager/trigger-windowheating', post={ 'triggerAction' : True if action.lower() == 'on' else False })
-        
-    def set_combustion_heating(self, action='off', spin=1111):
-        self.__check_dashboard()
-        if (action.lower() == 'on'):
-            self.__command('/-/rah/quick-start', post={ 'triggerAction' : True, 'startMode' : 'HEATING', 'spin': spin })
-        else:
-            self.__command('/-/rah/quick-stop')
- 
