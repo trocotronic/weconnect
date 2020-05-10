@@ -68,7 +68,9 @@ class WeConnect():
     ACCESS_FILE = 'weconnectAPI.access'
     BASE_URL = 'https://msg.volkswagen.de/fs-car'
     TOKEN_URL = 'https://tokenrefreshservice.apps.emea.vwapps.io'
+    PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
     __tokens = None
+    __credentials = {}
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
@@ -76,26 +78,27 @@ class WeConnect():
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
         if r.status_code != requests.codes.ok:
-            raise UrlError(r.status_code, "Unknown status code {}".format(r.status_code), r)
+            raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
-    def __command(self, command, post={}, dashboard=None):
+    def __command(self, command, post=None, dashboard=None):
         if (not dashboard):
             dashboard = self.__dashboard
-        r = self.__get_url(dashboard+command, post=post, headers={'X-CSRF-Token': self.__csrf})
+        try:
+            if (not self.__check_tokens()):
+                self.__force_login()
+        except UrlError as e:
+            raise VWError('Aborting command {}: login failed ({})'.format(command,e.message))
+        r = self.__get_url(dashboard+command, json=post, headers={'authorization': 'Bearer '+self.__tokens['access_token'], 'authority': 'customer-profile.apps.emea.vwapps.io'})
         if ('application/json' in r.headers['Content-Type']):
             jr = r.json()
-            if (jr['errorCode'] != '0'):
-                if ('errorType' in jr):
-                    raise VWError('JSON Response with error = {} ({})'.format(jr['errorCode'], jr['errorType']))
-                else:
-                    raise VWError('JSON Response with error = {}'.format(jr['errorCode']))
             return jr
         return r
     
-    def __init__(self, country_code=None):
+    def __init__(self, user, password):
         self.__session = requests.Session()
-        self._CountryCode = country_code
+        self.__credentials['user'] = user
+        self.__credentials['password'] = password
         try:
             with open(WeConnect.SESSION_FILE, 'rb') as f:
                 self.__session.cookies.update(pickle.load(f))
@@ -111,23 +114,33 @@ class WeConnect():
             pass
         self.__session.mount("carnet://", CarNetAdapter())
         
-    def refresh(self):
+    def __check_tokens(self):
         if (self.__tokens):
             if (self.__tokens['timestamp']+self.__tokens['expires_in'] > time.time()):
                 return True
-            try:
-                r = self.__get_url(self.TOKEN_URL+'/refreshTokens', json={'refresh_token': self.__tokens['refresh_token']})
-                self.__tokens = r.json()
-                self.__tokens['timestamp'] = time.time()
-                return True
-            except UrlError as e:
-                return False
-        else:
-            return False
+            r = self.__get_url(self.TOKEN_URL+'/refreshTokens', post={'refresh_token': self.__tokens['refresh_token']})
+            self.__tokens = r.json()
+            self.__tokens['timestamp'] = time.time()
+            self.__save_access()
+            return True
+        return False
+        
+    def __save_access(self):
+        t = {}
+        t['identities'] = self.__identities
+        t['identity_kit'] = self.__identity_kit
+        t['tokens'] = self.__tokens
+        with open(WeConnect.ACCESS_FILE, 'w') as f:
+            json.dump(t, f)
         
     
-    def login(self, user, password):     
-        if (not self.refresh()):
+    def login(self):     
+        if (not self.__check_tokens()):
+            return self.__force_login()
+        return True
+    
+    def __force_login():
+        try:
             code_verifier = base64URLEncode(os.urandom(32))
             if len(code_verifier) < 43:
                 raise ValueError("Verifier too short. n_bytes must be > 30.")
@@ -153,7 +166,7 @@ class WeConnect():
             post = {}
             for h in hiddn:
                 post[h['name']] = h['value']
-            post['email'] = user
+            post['email'] = self.__credentials['user']
             
             upr = urlparse(r.url)
             r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
@@ -177,11 +190,12 @@ class WeConnect():
             post = {}
             for h in hiddn:
                 post[h['name']] = h['value']
-            post['password'] = password
+            post['password'] = self.__credentials['password']
             
             upr = urlparse(r.url)
             r =  self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
             self.__identities = get_url_params(r.history[-1].url)
+            self.__identities['profile_url'] = WeConnect.PROFILE_URL.format(self.__identities['user_id'])
             self.__identity_kit = r.params
             data = {
                 'auth_code': self.__identity_kit['code'],
@@ -193,10 +207,13 @@ class WeConnect():
             self.__tokens['timestamp'] = time.time()
             with open(WeConnect.SESSION_FILE, 'wb') as f:
                 pickle.dump(self.__session.cookies, f)
-            t = {}
-            t['identities'] = self.__identities
-            t['identity_kit'] = self.__identity_kit
-            t['tokens'] = self.__tokens
-            with open(WeConnect.ACCESS_FILE, 'w') as f:
-                json.dump(t, f)
+            self.__save_access()
+            return True
+        except UrlError:
+            pass
+        return False
  
+    def get_personal_data(self):
+        r = self.__command('/personalData', dashboard=self.__identities['profile_url'])
+        return r
+        
