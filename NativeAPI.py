@@ -392,3 +392,69 @@ class WeConnect():
     def get_honk_and_flash_status(self, vin, rid):
         r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash/'+str(rid)+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
+    
+    def battery_charge(self, vin, action='off'):
+        data = {
+            'action': {
+                'type': 'start' if action.lower() == 'on' else 'stop'
+                }
+                
+            }
+        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def climatisation(self, vin, action='off'):
+        data = {
+            'action': {
+                'type': 'startClimatisation' if action.lower() == 'on' else 'stopClimatisation'
+                }
+                
+            }
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def climatisation_temperature(self, vin, temperature=21.5):
+        dk = temperature*10+2731
+        data = {
+            'action': {
+                'type': 'setSettings',
+                'settings': {
+                    'targetTemperature': dk,
+                    'climatisationWithoutHVpower': False,
+                    'heaterSource': 'electric',
+                    }
+                }
+                
+            }
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def window_melt(self, vin, action='off'):
+        data = {
+            'action': {
+                'type': 'startWindowHeating' if action.lower() == 'on' else 'stopWindowHeating'
+                }
+                
+            }
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def request_secure_token(self, vin, service):
+        r = self.__command('/rolesrights/authorization/v2/vehicles/'+vin+'/services/'+service+'/security-pin-auth-requested', dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
+        return r
+        
+    def heating(self, vin, action='off'):
+        data = {
+            'performAction': {
+                'quickstart': {
+                    'active': True if action.lower() == 'on' else False
+                    }
+                }
+                
+            }
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    
+        
+        
