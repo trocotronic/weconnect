@@ -26,6 +26,16 @@ def get_random_string(length=12,
                                     'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'):
     return ''.join(random.choice(allowed_chars) for i in range(length))
 
+def random_id():
+    allowed_chars = '0123456789abcdef'
+    
+    return (''.join(random.choice(allowed_chars) for i in range(8))+'-'+
+        ''.join(random.choice(allowed_chars) for i in range(4))+'-'+
+        ''.join(random.choice(allowed_chars) for i in range(4))+'-'+
+        ''.join(random.choice(allowed_chars) for i in range(4))+'-'+
+        ''.join(random.choice(allowed_chars) for i in range(12)))
+
+
 def base64URLEncode(s):
     return base64.urlsafe_b64encode(s).rstrip(b'=')
 
@@ -69,8 +79,11 @@ class WeConnect():
     BASE_URL = 'https://msg.volkswagen.de/fs-car'
     TOKEN_URL = 'https://tokenrefreshservice.apps.emea.vwapps.io'
     PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
+    OAUTH_URL = 'https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/oauth2/v1/token'
     __tokens = None
     __credentials = {}
+    __x_client_id = None
+    __oauth = {}
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
@@ -81,15 +94,21 @@ class WeConnect():
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
-    def __command(self, command, post=None, dashboard=None):
+    def __command(self, command, post=None, dashboard=None, scope=None):
         if (not dashboard):
             dashboard = self.__dashboard
+        if (not scope):
+            scope = self.__tokens
         try:
             if (not self.__check_tokens()):
                 self.__force_login()
         except UrlError as e:
             raise VWError('Aborting command {}: login failed ({})'.format(command,e.message))
-        r = self.__get_url(dashboard+command, json=post, headers={'authorization': 'Bearer '+self.__tokens['access_token'], 'authority': 'customer-profile.apps.emea.vwapps.io'})
+        headers = {
+            'Authorization': 'Bearer '+scope['access_token'],
+            'Accept': 'application/json'
+            }
+        r = self.__get_url(dashboard+command, json=post, headers=headers)
         if ('application/json' in r.headers['Content-Type']):
             jr = r.json()
             return jr
@@ -110,11 +129,25 @@ class WeConnect():
                 self.__identities = d['identities']
                 self.__identity_kit = d['identity_kit']
                 self.__tokens = d['tokens']
+                self.__x_client_id = d['x-client-id']
+                self.__oauth = d['oauth']
         except FileNotFoundError:
             pass
         self.__session.mount("carnet://", CarNetAdapter())
-        
-    def __check_tokens(self):
+    
+    def __refresh_oauth_scope(self, scope):
+        data = {
+            'grant_type': 'refresh_token',
+            'scope': scope,
+            'token': self.__oauth['sc2:fal']['refresh_token']
+            }
+        r = self.__get_url(self.OAUTH_URL, post=data, headers={'X-Client-Id':self.__x_client_id})
+        jr = r.json()
+        self.__oauth[scope] = jr
+        self.__oauth[scope]['timestamp'] = time.time()
+        self.__save_access()
+    
+    def __check_kit_tokens(self):
         if (self.__tokens):
             if (self.__tokens['timestamp']+self.__tokens['expires_in'] > time.time()):
                 return True
@@ -124,12 +157,28 @@ class WeConnect():
             self.__save_access()
             return True
         return False
+    
+    def __check_oauth_scope(self, scope):
+        if (scope in self.__oauth and self.__oauth[scope]):
+            if (self.__oauth[scope]['timestamp']+self.__oauth[scope]['expires_in'] > time.time()):
+                return True
+            self.__refresh_oauth_scope(scope)
+            return True
+        return False
+    
+    def __check_oauth_tokens(self):
+        return self.__check_oauth_scope('sc2:fal') and self.__check_oauth_scope('t2_v:cubic')
+    
+    def __check_tokens(self):
+        return self.__check_kit_tokens() and self.__check_oauth_tokens()
         
     def __save_access(self):
         t = {}
         t['identities'] = self.__identities
         t['identity_kit'] = self.__identity_kit
         t['tokens'] = self.__tokens
+        t['x-client-id'] = self.__x_client_id
+        t['oauth'] = self.__oauth
         with open(WeConnect.ACCESS_FILE, 'w') as f:
             json.dump(t, f)
         
@@ -139,8 +188,7 @@ class WeConnect():
             return self.__force_login()
         return True
     
-    def __force_login():
-        try:
+    def __force_login(self):
             code_verifier = base64URLEncode(os.urandom(32))
             if len(code_verifier) < 43:
                 raise ValueError("Verifier too short. n_bytes must be > 30.")
@@ -205,15 +253,52 @@ class WeConnect():
             r = self.__get_url('https://tokenrefreshservice.apps.emea.vwapps.io/exchangeAuthCode', post=data)
             self.__tokens = r.json()
             self.__tokens['timestamp'] = time.time()
+            if (not self.__x_client_id):
+                data = {
+                    "appId": "de.volkswagen.car-net.eu.e-remote",
+                    "appName": "We Connect",
+                    "appVersion": "5.3.2",
+                    "client_brand": "VW",
+                    "client_name": "iPhone",
+                    "platform": "iOS"
+                }
+                r = self.__get_url('https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/register/v1', json=data)
+                self.__x_client_id = r.json()['client_id']
+            
+            data = {
+                'grant_type': 'id_token',
+                'scope': 'sc2:fal',
+                'token': self.__tokens['id_token']
+                }
+            r = self.__get_url(self.OAUTH_URL, post=data, headers={'X-Client-Id':self.__x_client_id})
+            jr = r.json()
+            self.__oauth['sc2:fal'] = jr
+            self.__oauth['sc2:fal']['timestamp'] = time.time()
+            
+            self.__refresh_oauth_scope('t2_v:cubic')
+            print('ieeeeee')
             with open(WeConnect.SESSION_FILE, 'wb') as f:
                 pickle.dump(self.__session.cookies, f)
             self.__save_access()
-            return True
-        except UrlError:
-            pass
-        return False
  
     def get_personal_data(self):
         r = self.__command('/personalData', dashboard=self.__identities['profile_url'])
         return r
+        
+    def get_real_car_data(self):
+        r = self.__command('/realCarData', dashboard=self.__identities['profile_url'])
+        return r
+        
+    def get_mbb_status(self):
+        r = self.__command('/mbbStatusData', dashboard=self.__identities['profile_url'])
+        return r
+        
+    def get_identity_data(self):
+        r = self.__command('/identityData', dashboard=self.__identities['profile_url'])
+        return r
+    
+    def get_vehicles(self):
+        r = self.__command('/usermanagement/users/v1/VW/DE/vehicles', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'])
+        return r
+        
         
