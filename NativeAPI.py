@@ -84,6 +84,7 @@ class WeConnect():
     __credentials = {}
     __x_client_id = None
     __oauth = {}
+    __accept_mbb = 'application/vnd.vwg.mbb.vehicleDataDetail_v2_1_0+json, application/vnd.vwg.mbb.genericError_v1_0_2+json'
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
@@ -91,10 +92,11 @@ class WeConnect():
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
         if r.status_code != requests.codes.ok:
+            print(r.url)
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
-    def __command(self, command, post=None, dashboard=None, scope=None):
+    def __command(self, command, post=None, dashboard=None, accept='application/json', scope=None):
         if (not dashboard):
             dashboard = self.__dashboard
         if (not scope):
@@ -106,10 +108,10 @@ class WeConnect():
             raise VWError('Aborting command {}: login failed ({})'.format(command,e.message))
         headers = {
             'Authorization': 'Bearer '+scope['access_token'],
-            'Accept': 'application/json'
+            'Accept':accept,
             }
         r = self.__get_url(dashboard+command, json=post, headers=headers)
-        if ('application/json' in r.headers['Content-Type']):
+        if ('json' in r.headers['Content-Type']):
             jr = r.json()
             return jr
         return r
@@ -276,7 +278,6 @@ class WeConnect():
             self.__oauth['sc2:fal']['timestamp'] = time.time()
             
             self.__refresh_oauth_scope('t2_v:cubic')
-            print('ieeeeee')
             with open(WeConnect.SESSION_FILE, 'wb') as f:
                 pickle.dump(self.__session.cookies, f)
             self.__save_access()
@@ -300,5 +301,8 @@ class WeConnect():
     def get_vehicles(self):
         r = self.__command('/usermanagement/users/v1/VW/DE/vehicles', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'])
         return r
-        
+    
+    def get_vehicle_data(self, vin):
+        r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
         
