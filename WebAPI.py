@@ -33,7 +33,7 @@ class WeConnect():
             r = self.__session.get(url, params=get, headers=headers, cookies=cookies)
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
-        if r.status_code != requests.codes.ok:
+        if r.status_code >= 400:
             raise UrlError(r.status_code, "Unknown status code", r)
         return r
     
