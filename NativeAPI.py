@@ -81,26 +81,24 @@ class WeConnect():
     PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
     OAUTH_URL = 'https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/oauth2/v1/token'
     USER_URL = 'https://userinformationservice.apps.emea.vwapps.io/iaa/uic/v1'
+    MAL_URL = 'https://mal-1a.prd.ece.vwg-connect.com/api'
     __tokens = None
     __credentials = {}
     __x_client_id = None
     __oauth = {}
-    __accept_mbb = 'application/vnd.vwg.mbb.vehicleDataDetail_v2_1_0+json, application/vnd.vwg.mbb.genericError_v1_0_2+json'
-    __accept_fences = 'application/vnd.vwg.mbb.geofencingAlerts_v1_0_0+json,application/vnd.volkswagenag.com-error-v1+json'
-    __accept_alerts = 'application/vnd.vwg.mbb.speedAlerts_v1_0_0+json,application/vnd.volkswagenag.com-error-v1+json'
-    __accept_tripdata = 'application/vnd.vwg.mbb.tripdata_v1_0_1+json,application/vnd.volkswagenag.com-error-v1+json'
+    __accept_mbb = 'application/json, application/vnd.volkswagenag.com-error-v1+json, */*'
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
             r = self.__session.get(url, params=get, headers=headers, cookies=cookies)
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
-        if r.status_code != requests.codes.ok:
+        if r.status_code >= 400:
             print(r.url)
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
-    def __command(self, command, post=None, dashboard=None, accept='application/json', scope=None):
+    def __command(self, command, post=None, dashboard=None, accept='application/json', content_type=None, scope=None):
         if (not dashboard):
             dashboard = self.__dashboard
         if (not scope):
@@ -114,8 +112,10 @@ class WeConnect():
             'Authorization': 'Bearer '+scope['access_token'],
             'Accept': accept,
             'X-App-Version': '5.3.2',
-            'X-App-Name': 'We Connect'
+            'X-App-Name': 'We Connect',
             }
+        if (content_type):
+            headers['Content-Type'] = content_type
         r = self.__get_url(dashboard+command, json=post, headers=headers)
         if ('json' in r.headers['Content-Type']):
             jr = r.json()
@@ -170,8 +170,9 @@ class WeConnect():
         if (scope in self.__oauth and self.__oauth[scope]):
             if (self.__oauth[scope]['timestamp']+self.__oauth[scope]['expires_in'] > time.time()):
                 return True
-            self.__refresh_oauth_scope(scope)
-            return True
+            if ('sc2:fal' in self.__oauth and 'refresh_token' in self.__oauth['sc2:fal']):
+                self.__refresh_oauth_scope(scope)
+                return True
         return False
     
     def __check_oauth_tokens(self):
@@ -286,6 +287,8 @@ class WeConnect():
             self.__refresh_oauth_scope('t2_v:cubic')
             with open(WeConnect.SESSION_FILE, 'wb') as f:
                 pickle.dump(self.__session.cookies, f)
+            r = self.get_personal_data()
+            self.__identities['business_id'] = r['businessIdentifierValue']
             self.__save_access()
  
     def get_personal_data(self):
@@ -309,7 +312,8 @@ class WeConnect():
         return r
     
     def get_vehicle_data(self, vin):
-        r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        __accept = 'application/vnd.vwg.mbb.vehicleDataDetail_v2_1_0+json, application/vnd.vwg.mbb.genericError_v1_0_2+json'
+        r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=__accept)
         return r
     
     def get_users(self, vin):
@@ -317,15 +321,74 @@ class WeConnect():
         return r
     
     def get_fences(self, vin):
-        r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_fences)
+        r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_alerts(self, vin):
-        r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_alerts)
+        r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
-    def get_tripdata(self, vin, type='longTerm'):
+    def get_trip_data(self, vin, type='longTerm'):
         #type: longTerm, cyclic, shortTerm
-        r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_tripdata)
+        r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
+    
+    def get_vsr(self, vin):
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_departure_timer(self, vin):
+        r = self.__command('/bs/departuretimer/v1/VW/DE/vehicles/'+vin+'/timer', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_climater(self, vin):
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_position(self, vin):
+        r = self.__command('/bs/cf/v1/VW/DE/vehicles/'+vin+'/position', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_destinations(self, vin):
+        r = self.__command('/destinationfeedservice/mydestinations/v1/VW/DE/vehicles/'+vin+'/destinations', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_charger(self, vin):
+        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_heating_status(self, vin):
+        r = self.__command('/bs/rs/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_history(self, vin):
+        r = self.__command('/bs/dwap/v1/VW/DE/vehicles/'+vin+'/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def request_status_update(self, vin):
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.BASE_URL, post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def __flash_and_honk(self, vin, mode, lat, long):
+        data = {
+            'honkAndFlashRequest': {
+                'serviceOperationCode': mode,
+                'serviceDuration': 15,
+                'userPosition': {
+                    'latitude': lat,
+                    'longitude': long,
+                    }
+                }
+            }
+        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def flash(self, vin, lat, long):
+        return self.__flash_and_honk(vin, 'FLASH_ONLY', lat, long)
         
+    def honk(self, vin, lat, long):
+        return self.__flash_and_honk(vin, 'HONK_AND_FLASH', lat, long)
+    
+    def get_honk_and_flash_status(self, vin, rid):
+        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash/'+str(rid)+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
