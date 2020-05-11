@@ -80,11 +80,15 @@ class WeConnect():
     TOKEN_URL = 'https://tokenrefreshservice.apps.emea.vwapps.io'
     PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
     OAUTH_URL = 'https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/oauth2/v1/token'
+    USER_URL = 'https://userinformationservice.apps.emea.vwapps.io/iaa/uic/v1'
     __tokens = None
     __credentials = {}
     __x_client_id = None
     __oauth = {}
     __accept_mbb = 'application/vnd.vwg.mbb.vehicleDataDetail_v2_1_0+json, application/vnd.vwg.mbb.genericError_v1_0_2+json'
+    __accept_fences = 'application/vnd.vwg.mbb.geofencingAlerts_v1_0_0+json,application/vnd.volkswagenag.com-error-v1+json'
+    __accept_alerts = 'application/vnd.vwg.mbb.speedAlerts_v1_0_0+json,application/vnd.volkswagenag.com-error-v1+json'
+    __accept_tripdata = 'application/vnd.vwg.mbb.tripdata_v1_0_1+json,application/vnd.volkswagenag.com-error-v1+json'
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
@@ -108,7 +112,9 @@ class WeConnect():
             raise VWError('Aborting command {}: login failed ({})'.format(command,e.message))
         headers = {
             'Authorization': 'Bearer '+scope['access_token'],
-            'Accept':accept,
+            'Accept': accept,
+            'X-App-Version': '5.3.2',
+            'X-App-Name': 'We Connect'
             }
         r = self.__get_url(dashboard+command, json=post, headers=headers)
         if ('json' in r.headers['Content-Type']):
@@ -304,5 +310,22 @@ class WeConnect():
     
     def get_vehicle_data(self, vin):
         r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_users(self, vin):
+        r = self.__command('/vin/'+vin+'/users', dashboard=self.USER_URL, post={'idP_IT': self.__identity_kit['id_token']})
+        return r
+    
+    def get_fences(self, vin):
+        r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_fences)
+        return r
+    
+    def get_alerts(self, vin):
+        r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_alerts)
+        return r
+    
+    def get_tripdata(self, vin, type='longTerm'):
+        #type: longTerm, cyclic, shortTerm
+        r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_tripdata)
         return r
         
