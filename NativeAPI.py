@@ -94,6 +94,9 @@ class WeConnect():
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
         if r.status_code >= 400:
+            print(r.url)
+            print(r.request.method)
+            print(r.request.headers)
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
@@ -112,6 +115,9 @@ class WeConnect():
             'Accept': accept,
             'X-App-Version': '5.3.2',
             'X-App-Name': 'We Connect',
+            'X-DeviceToken': 'e94a871ab4d0928b366cff4c03838acbb3a5396bd07e5b3ecbf13b3f595cb2cb',
+            'X-App-Id': 'de.volkswagen.car-net.eu.e-remote',
+            'X-Platform': 'apple'
             }
         if (content_type):
             headers['Content-Type'] = content_type
@@ -395,6 +401,11 @@ class WeConnect():
     
     def get_fetched_role(self, vin):
         r = self.__command('/rolesrights/permissions/v1/VW/DE/vehicles/'+vin+'/fetched-role', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_vehicle_health_report(self, vin):
+        __accept = 'application/vnd.vwg.mbb.sharedTelemetricReport_v1_0_0+xml, application/vnd.vwg.mbb.genericError_v1_1_1+xml'
+        r = self.__command('/vehiclehealthreport/myreports/v1/VW/DE/vehicles/'+vin+'/users/'+self.__identities['business_id']+'/vehicleHealthReports/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=__accept)
         return r        
     
     def request_status_update(self, vin):
