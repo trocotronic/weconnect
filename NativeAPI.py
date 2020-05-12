@@ -80,7 +80,7 @@ class WeConnect():
     TOKEN_URL = 'https://tokenrefreshservice.apps.emea.vwapps.io'
     PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
     OAUTH_URL = 'https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/oauth2/v1/token'
-    USER_URL = 'https://userinformationservice.apps.emea.vwapps.io/iaa/uic/v1'
+    USER_URL = 'https://userinformationservice.apps.emea.vwapps.io/iaa'
     MAL_URL = 'https://mal-1a.prd.ece.vwg-connect.com/api'
     __tokens = None
     __credentials = {}
@@ -333,7 +333,7 @@ class WeConnect():
         return r
     
     def get_users(self, vin):
-        r = self.__command('/vin/'+vin+'/users', dashboard=self.USER_URL, post={'idP_IT': self.__identity_kit['id_token']})
+        r = self.__command('/uic/v1/vin/'+vin+'/users', dashboard=self.USER_URL, post={'idP_IT': self.__identity_kit['id_token']})
         return r
     
     def get_fences(self, vin):
@@ -388,6 +388,14 @@ class WeConnect():
     def get_history(self, vin):
         r = self.__command('/bs/dwap/v1/VW/DE/vehicles/'+vin+'/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
+    
+    def get_roles_rights(self, vin):
+        r = self.__command('/rolesrights/operationlist/v3/vehicles/'+vin+'/users/'+self.__identities['business_id'], dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_fetched_role(self, vin):
+        r = self.__command('/rolesrights/permissions/v1/VW/DE/vehicles/'+vin+'/fetched-role', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r        
     
     def request_status_update(self, vin):
         r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.BASE_URL, post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
