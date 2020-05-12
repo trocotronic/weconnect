@@ -340,8 +340,16 @@ class WeConnect():
         r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
-    def get_alerts(self, vin):
+    def get_fences_configuration(self):
+        r = self.__command('/bs/geofencing/v1/VW/DE/geofencingConfiguration', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_speed_alerts(self, vin):
         r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_speed_alerts_configuration(self):
+        r = self.__command('/bs/speedalert/v1/VW/DE/speedAlertConfiguration', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_trip_data(self, vin, type='longTerm'):
@@ -407,6 +415,10 @@ class WeConnect():
     
     def get_honk_and_flash_status(self, vin, rid):
         r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash/'+str(rid)+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_honk_and_flash_configuration(self):
+        r = self.__command('/bs/rhf/v1/VW/DE/configuration', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def battery_charge(self, vin, action='off'):
@@ -476,9 +488,7 @@ class WeConnect():
         r = self.__command('/rolesrights/authorization/v2/security-pin-auth-completed', post=data, dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
         if ('securityToken' in r):
             return r['securityToken']
-        return None
-    
-    
+        return None    
         
     def heating(self, vin, action='off'):
         if (action == 'on'):
