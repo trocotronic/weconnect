@@ -17,7 +17,7 @@ class UrlError(VWError):
         super().__init__(message)
     pass
 
-import requests, pickle, hashlib, base64, os, random, time, json
+import requests, pickle, hashlib, base64, os, random, time, json, xmltodict
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, unquote_plus
 
@@ -94,9 +94,6 @@ class WeConnect():
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
         if r.status_code >= 400:
-            print(r.url)
-            print(r.request.method)
-            print(r.request.headers)
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
@@ -115,9 +112,7 @@ class WeConnect():
             'Accept': accept,
             'X-App-Version': '5.3.2',
             'X-App-Name': 'We Connect',
-            'X-DeviceToken': 'e94a871ab4d0928b366cff4c03838acbb3a5396bd07e5b3ecbf13b3f595cb2cb',
-            'X-App-Id': 'de.volkswagen.car-net.eu.e-remote',
-            'X-Platform': 'apple'
+            'Accept-Language': 'en-US',
             }
         if (content_type):
             headers['Content-Type'] = content_type
@@ -404,9 +399,20 @@ class WeConnect():
         return r
     
     def get_vehicle_health_report(self, vin):
-        __accept = 'application/vnd.vwg.mbb.sharedTelemetricReport_v1_0_0+xml, application/vnd.vwg.mbb.genericError_v1_1_1+xml'
+        # DEPRECATED: this method is not reliable. It queries to far away GW sometimes it returns e504. The information returned is equivlent to get_vsr()
+        # https://blog.vensis.pl/2019/11/vw-hacking/
+        __accept = 'application/vnd.vwg.mbb.sharedTelemetricReport_v1_0_0+xml, application/vnd.vwg.mbb.genericError_v1_1_1+xml, */*'
         r = self.__command('/vehiclehealthreport/myreports/v1/VW/DE/vehicles/'+vin+'/users/'+self.__identities['business_id']+'/vehicleHealthReports/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=__accept)
-        return r        
+        namespaces = {
+            'http://www.vw.com/mbb/service_TelemetricSharedService_MBB': None,
+            'http://xmldefs.volkswagenag.com/DD/MaintenanceEvent/V1': None,
+            }
+        jr = json.dumps(xmltodict.parse(r.content,process_namespaces=True,namespaces=namespaces))
+        return jr
+    
+    def get_car_port_data(self, vin):
+        r = self.__command('/promoter/portfolio/v1/VW/DE/vehicle/'+vin+'/carportdata', dashboard=self.BASE_URL, accept=self.__accept_mbb, scope=self.__oauth['sc2:fal'])
+        return r
     
     def request_status_update(self, vin):
         r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.BASE_URL, post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
