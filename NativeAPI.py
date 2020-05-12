@@ -94,11 +94,10 @@ class WeConnect():
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
         if r.status_code >= 400:
-            print(r.url)
             raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
         return r
     
-    def __command(self, command, post=None, dashboard=None, accept='application/json', content_type=None, scope=None):
+    def __command(self, command, post=None, data=None, dashboard=None, accept='application/json', content_type=None, scope=None, secure_token=None):
         if (not dashboard):
             dashboard = self.__dashboard
         if (not scope):
@@ -116,16 +115,33 @@ class WeConnect():
             }
         if (content_type):
             headers['Content-Type'] = content_type
-        r = self.__get_url(dashboard+command, json=post, headers=headers)
+        if (secure_token):
+            headers['X-MBBSecToken'] = secure_token
+        r = self.__get_url(dashboard+command, json=post, post=data, headers=headers)
         if ('json' in r.headers['Content-Type']):
             jr = r.json()
             return jr
         return r
     
-    def __init__(self, user, password):
+    def __init__(self, user, password, spin=None):
         self.__session = requests.Session()
         self.__credentials['user'] = user
         self.__credentials['password'] = password
+        self.__credentials['spin'] = None
+        if (spin):
+            if (isinstance(spin, int)):
+                spin = str(spin).zfill(4)
+            if (isinstance(spin, str)):
+                if (len(spin) != 4):
+                    raise VWError('Wrong S-PIN format: must be 4-digits')
+                try:
+                    d = int(spin)
+                except ValueError:
+                    raise VWError('Wrong S-PIN format: must be 4-digits')
+                self.__credentials['spin'] = spin
+            else:
+                raise VWError('Wrong S-PIN format: must be 4-digits')
+        
         try:
             with open(WeConnect.SESSION_FILE, 'rb') as f:
                 self.__session.cookies.update(pickle.load(f))
@@ -329,7 +345,7 @@ class WeConnect():
         return r
     
     def get_trip_data(self, vin, type='longTerm'):
-        #type: longTerm, cyclic, shortTerm
+        # type: 'longTerm', 'cyclic', 'shortTerm'
         r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
@@ -439,20 +455,48 @@ class WeConnect():
         r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
-    def request_secure_token(self, vin, service):
+    def __generate_secure_pin(self, challenge):
+        if (not self.__credentials['spin']):
+            raise VWError('Cannot process this command: S-PIN not provided.')
+        return hashlib.sha512(bytearray.fromhex(self.__credentials['spin']+challenge)).hexdigest().upper()
+    
+    def __request_secure_token(self, vin, service):
         r = self.__command('/rolesrights/authorization/v2/vehicles/'+vin+'/services/'+service+'/security-pin-auth-requested', dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
-        return r
+        challenge = r['securityPinAuthInfo']['securityPinTransmission']['challenge']
+        secure_pin = self.__generate_secure_pin(challenge)
+        data = {
+            'securityPinAuthentication': {
+                'securityPin': {
+                    'challenge': challenge,
+                    'securityPinHash': secure_pin.upper(),
+                    },
+                'securityToken': r['securityPinAuthInfo']['securityToken']
+            }
+        }
+        r = self.__command('/rolesrights/authorization/v2/security-pin-auth-completed', post=data, dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
+        if ('securityToken' in r):
+            return r['securityToken']
+        return None
+    
+    
         
     def heating(self, vin, action='off'):
-        data = {
-            'performAction': {
-                'quickstart': {
-                    'active': True if action.lower() == 'on' else False
-                    }
-                }
-                
-            }
-        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        if (action == 'on'):
+            data = '<?xml version="1.0" encoding= "UTF-8" ?>\n<performAction xmlns="http://audi.de/connect/rs">\n   <quickstart>\n      <active>true</active>\n   </quickstart>\n</performAction>'
+        else:
+            data = '<?xml version="1.0" encoding= "UTF-8" ?>\n<performAction xmlns="http://audi.de/connect/rs">\n   <quickstop>\n      <active>false</active>\n   </quickstop>\n</performAction>'
+        
+        secure_token = self.__request_secure_token(vin, 'rheating_v1/operations/P_QSACT')
+        r = self.__command('/bs/rs/v1/VW/DE/vehicles/'+vin+'/actions', dashboard=self.BASE_URL, data=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb, content_type='application/vnd.vwg.mbb.RemoteStandheizung_v2_0_0+xml', secure_token=secure_token)
+        return r
+    
+    def lock(self, vin, action='lock'):
+        if (action == 'unlock'):
+            data = '<?xml version="1.0" encoding= "UTF-8" ?>\n<rluAction xmlns="http://audi.de/connect/rlu">\n   <action>unlock</action>\n</rluAction>'
+        else:
+            data='<?xml version="1.0" encoding= "UTF-8" ?>\n<rluAction xmlns="http://audi.de/connect/rlu">\n   <action>lock</action>\n</rluAction>'
+        secure_token = self.__request_secure_token(vin, 'rlu_v1/operations/' + action.upper())
+        r = self.__command('/bs/rlu/v1/VW/DE/vehicles/'+vin+'/actions', dashboard=self.BASE_URL, data=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb, content_type='application/vnd.vwg.mbb.RemoteLockUnlock_v1_0_0+xml', secure_token=secure_token)
         return r
     
     
