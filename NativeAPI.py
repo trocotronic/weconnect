@@ -4,11 +4,15 @@ Created on Sun May 10 19:12:29 2020
 
 @author: Trocotronic
 """
+import logging
+logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logging.getLogger().setLevel(logging.INFO)
 
 class VWError(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(message)
+        logging.critical('Raising error msg: %s', message)
 
 class UrlError(VWError):
     def __init__(self, status_code, message, request):
@@ -61,10 +65,12 @@ class CarNetAdapter(requests.adapters.HTTPAdapter):
         url = None
         request = None
         params = {}
+        headers = None
         
         def __init__(self, request):
             self.request = request
             self.url = request.url
+            self.headers = request.headers
             self.params = get_url_params(self.url)
                 
     def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
@@ -93,8 +99,27 @@ class WeConnect():
             r = self.__session.get(url, params=get, headers=headers, cookies=cookies)
         else:
             r = self.__session.post(url, data=post, json=json, params=get, headers=headers, cookies=cookies)
+        logging.info('Sending %s request to %s', r.request.method, r.url)
+        logging.debug('Parameters: %s', r.request.url)
+        logging.debug('Headers: %s', r.request.headers)
+        logging.info('Response with code: %d', r.status_code)
+        logging.debug('Headers: %s', r.headers)
+        logging.debug('History: %s', r.history)
         if r.status_code >= 400:
-            raise UrlError(r.status_code, "Error: status code {}".format(r.status_code), r)
+            try:
+                e = r.json()
+                msg = 'Error {}'.format(r.status_code)
+                logging.debug('Response error in JSON format')
+                if ('error' in e):
+                    msg += ':'
+                    if ('errorCode' in e['error']):
+                        msg += ' [{}]'.format(e['error']['errorCode'])
+                    if ('description' in e['error']):
+                        msg += ' '+e['error']['description']
+            except ValueError:
+                logging.debug('Response error is not JSON format')
+                msg = "Error: status code {}".format(r.status_code)
+            raise UrlError(r.status_code, msg, r)
         return r
     
     def __command(self, command, post=None, data=None, dashboard=None, accept='application/json', content_type=None, scope=None, secure_token=None):
@@ -102,6 +127,20 @@ class WeConnect():
             dashboard = self.__dashboard
         if (not scope):
             scope = self.__tokens
+        logging.info('Preparing command: %s', command)
+        if (post):
+            logging.debug('JSON data: %s', post)
+        if (data):
+            logging.debug('POST data: %s', data)
+        logging.debug('Dashboard: %s', dashboard)
+        if (accept):
+            logging.debug('Accept: %s', accept)
+        if (content_type):
+            logging.debug('Content-tpye: %s', content_type)
+        if (scope):
+            logging.debug('Scope: %s', scope['__name__'])
+        if (secure_token):
+            logging.debug('Secure token: %s', secure_token)
         try:
             if (not self.__check_tokens()):
                 self.__force_login()
@@ -147,7 +186,7 @@ class WeConnect():
             with open(WeConnect.SESSION_FILE, 'rb') as f:
                 self.__session.cookies.update(pickle.load(f))
         except FileNotFoundError:
-            pass
+            logging.warning('Session file not found')
         try:
             with open(WeConnect.ACCESS_FILE, 'rb') as f:
                 d = json.load(f)
@@ -157,7 +196,7 @@ class WeConnect():
                 self.__x_client_id = d['x-client-id']
                 self.__oauth = d['oauth']
         except FileNotFoundError:
-            pass
+            logging.warning('Access file not found')
         self.__session.mount("carnet://", CarNetAdapter())
     
     def __refresh_oauth_scope(self, scope):
@@ -166,36 +205,48 @@ class WeConnect():
             'scope': scope,
             'token': self.__oauth['sc2:fal']['refresh_token']
             }
+        logging.debug('Refreshing OAUth scope %s', scope)
         r = self.__get_url(self.OAUTH_URL, post=data, headers={'X-Client-Id':self.__x_client_id})
+        logging.debug('Refreshed OAuth scope %s', scope)
         jr = r.json()
         self.__oauth[scope] = jr
         self.__oauth[scope]['timestamp'] = time.time()
+        self.__oauth[scope]['__name__'] = 'OAuth '+scope
         self.__save_access()
     
     def __check_kit_tokens(self):
         if (self.__tokens):
             if (self.__tokens['timestamp']+self.__tokens['expires_in'] > time.time()):
+                logging.debug('Tokens still valid')
                 return True
+            logging.debug('Token expired. Refreshing tokens')
             r = self.__get_url(self.TOKEN_URL+'/refreshTokens', post={'refresh_token': self.__tokens['refresh_token']})
             self.__tokens = r.json()
             self.__tokens['timestamp'] = time.time()
+            self.__tokens['__name__'] = 'Token'
             self.__save_access()
             return True
+        logging.debug('Token checking failed')
         return False
     
     def __check_oauth_scope(self, scope):
         if (scope in self.__oauth and self.__oauth[scope]):
             if (self.__oauth[scope]['timestamp']+self.__oauth[scope]['expires_in'] > time.time()):
+                logging.debug('OAuth %s still valid', scope)
                 return True
+            logging.debug('OAUth %s expired. Refreshing', scope)
             if ('sc2:fal' in self.__oauth and 'refresh_token' in self.__oauth['sc2:fal']):
                 self.__refresh_oauth_scope(scope)
                 return True
+            logging.error('OAUTH sc2:fal not present. Cannot refresh')
+        logging.debug('OAuth [%s] checking failed', scope)
         return False
     
     def __check_oauth_tokens(self):
         return self.__check_oauth_scope('sc2:fal') and self.__check_oauth_scope('t2_v:cubic')
     
     def __check_tokens(self):
+        logging.debug('Checking tokens')
         return self.__check_kit_tokens() and self.__check_oauth_tokens()
         
     def __save_access(self):
@@ -207,14 +258,16 @@ class WeConnect():
         t['oauth'] = self.__oauth
         with open(WeConnect.ACCESS_FILE, 'w') as f:
             json.dump(t, f)
+        logging.info('Saving access to file')
         
-    
-    def login(self):     
+    def login(self):
+        logging.info('Logging')
         if (not self.__check_tokens()):
             return self.__force_login()
         return True
     
     def __force_login(self):
+            logging.warning('Forcing login')
             code_verifier = base64URLEncode(os.urandom(32))
             if len(code_verifier) < 43:
                 raise ValueError("Verifier too short. n_bytes must be > 30.")
@@ -232,10 +285,17 @@ class WeConnect():
                 'client_id': '9496332b-ea03-4091-a224-8c746b885068@apps_vw-dilab_com',
                 'nonce': get_random_string(43),
                 }
+            logging.info('Attempting to login')
+            logging.debug('Login parameters: %s', login_para)
             r = self.__get_url('https://identity.vwgroup.io/oidc/v1/authorize', get=login_para)
             soup = BeautifulSoup(r.text, 'html.parser')
             form = soup.find('form', {'id': 'emailPasswordForm'})
+            if (not form):
+                raise VWError('Login form not 9found. Cannot continue')
+            if (not form.has_attr('action')):
+                raise VWError('action not found in login email form. Cannot continue')
             form_url = form['action']
+            logging.info('Found email login url: %s', form_url)
             hiddn = form.find_all('input', {'type': 'hidden'})
             post = {}
             for h in hiddn:
@@ -257,9 +317,12 @@ class WeConnect():
                         div = form.find('div', {'class': 'sub-title'})
                         if (div):
                             e = div.text
-                    raise UrlError(r.status_code, e, r)
-                raise UrlError(r.status_code, 'This account does not exist', r)
+                    raise VWError(e)
+                raise VWError('This account does not exist')
+            if (not form.has_attr('action')):
+                raise VWError('action not found in login password form. Cannot continue')
             form_url = form['action']
+            logging.info('Found password login url: %s', form_url)
             hiddn = form.find_all('input', {'type': 'hidden'})
             post = {}
             for h in hiddn:
@@ -269,17 +332,25 @@ class WeConnect():
             upr = urlparse(r.url)
             r =  self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
             self.__identities = get_url_params(r.history[-1].url)
+            logging.info('Received Identities')
+            logging.debug('Identities = %s', self.__identities)
             self.__identities['profile_url'] = WeConnect.PROFILE_URL.format(self.__identities['user_id'])
             self.__identity_kit = r.params
+            logging.info('Received CarNet Identity Kit')
+            logging.debug('Identity Kit = %s', r.params)
             data = {
                 'auth_code': self.__identity_kit['code'],
                 'code_verifier': code_verifier.decode(),
                 'id_token': self.__identity_kit['id_token'],
                 }
+            logging.info('Requesting Tokens')
             r = self.__get_url('https://tokenrefreshservice.apps.emea.vwapps.io/exchangeAuthCode', post=data)
             self.__tokens = r.json()
             self.__tokens['timestamp'] = time.time()
+            self.__tokens ['__name__'] = 'Token'
+            logging.info('Received Tokens')
             if (not self.__x_client_id):
+                logging.warning('X-client-id not found. Requesting a new one')
                 data = {
                     "appId": "de.volkswagen.car-net.eu.e-remote",
                     "appName": "We Connect",
@@ -290,22 +361,33 @@ class WeConnect():
                 }
                 r = self.__get_url('https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/register/v1', json=data)
                 self.__x_client_id = r.json()['client_id']
-            
+                logging.info('Received X-client-id')
+                logging.debug('X-client-id = %s', self.__x_client_id)
+            logging.info('Requesting OAuth [fal]')
             data = {
                 'grant_type': 'id_token',
                 'scope': 'sc2:fal',
                 'token': self.__tokens['id_token']
                 }
             r = self.__get_url(self.OAUTH_URL, post=data, headers={'X-Client-Id':self.__x_client_id})
+            logging.info('Received OAuth [fal]')
             jr = r.json()
+            
             self.__oauth['sc2:fal'] = jr
             self.__oauth['sc2:fal']['timestamp'] = time.time()
-            
+            self.__oauth['sc2:fal']['__name__'] = 'OAuth sc2:fal'
+            logging.debug('OAuth [fal] timestamp = %s', time.time())
+            logging.info('Requesting OAuth [cubic]')
             self.__refresh_oauth_scope('t2_v:cubic')
+            logging.debug('Received OAuth [cubic]')
             with open(WeConnect.SESSION_FILE, 'wb') as f:
                 pickle.dump(self.__session.cookies, f)
+            logging.debug('Saving session')
+            logging.info('Requesting personal data')
             r = self.get_personal_data()
             self.__identities['business_id'] = r['businessIdentifierValue']
+            logging.info('Received business identity')
+            logging.debug('Bussiness identity = %s', r['businessIdentifierValue'])
             self.__save_access()
  
     def get_personal_data(self):
@@ -411,6 +493,7 @@ class WeConnect():
         return jr
     
     def get_car_port_data(self, vin):
+        # It seems disabled. It returns e403 Forbidden
         r = self.__command('/promoter/portfolio/v1/VW/DE/vehicle/'+vin+'/carportdata', dashboard=self.BASE_URL, accept=self.__accept_mbb, scope=self.__oauth['sc2:fal'])
         return r
     
@@ -493,13 +576,20 @@ class WeConnect():
         return r
     
     def __generate_secure_pin(self, challenge):
+        logging.info('Generating secure pin')
         if (not self.__credentials['spin']):
             raise VWError('Cannot process this command: S-PIN not provided.')
-        return hashlib.sha512(bytearray.fromhex(self.__credentials['spin']+challenge)).hexdigest().upper()
+        spin =  hashlib.sha512(bytearray.fromhex(self.__credentials['spin']+challenge)).hexdigest().upper()
+        logging.info('Generated secure pin')
+        logging.debug('spin = %s', spin)
+        return spin
     
     def __request_secure_token(self, vin, service):
+        logging.info('Requesting secure token')
         r = self.__command('/rolesrights/authorization/v2/vehicles/'+vin+'/services/'+service+'/security-pin-auth-requested', dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
+        logging.info('Received secure token')
         challenge = r['securityPinAuthInfo']['securityPinTransmission']['challenge']
+        logging.debug('Challenge = %s', challenge)
         secure_pin = self.__generate_secure_pin(challenge)
         data = {
             'securityPinAuthentication': {
@@ -510,9 +600,13 @@ class WeConnect():
                 'securityToken': r['securityPinAuthInfo']['securityToken']
             }
         }
+        logging.info('Completing security pin auth')
         r = self.__command('/rolesrights/authorization/v2/security-pin-auth-completed', post=data, dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
+        logging.info('Completed security pin auth')
         if ('securityToken' in r):
+            logging.info('Received security token')
             return r['securityToken']
+        logging.error('No security token found')
         return None    
         
     def heating(self, vin, action='off'):
