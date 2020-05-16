@@ -93,6 +93,70 @@ class WeConnect():
     __x_client_id = None
     __oauth = {}
     __accept_mbb = 'application/json, application/vnd.volkswagenag.com-error-v1+json, */*'
+    __vsr_fields = [
+        ('0x0203FFFFFF', '0x0203010001', 'intervals', 'distance_to_oil_change'),
+        ('0x0203FFFFFF', '0x0203010002', 'intervals', 'time_to_oil_change'),
+        ('0x0203FFFFFF', '0x0203010003', 'intervals', 'distance_to_inspection'),
+        ('0x0203FFFFFF', '0x0203010004', 'intervals', 'time_to_inspection'),
+        ('0x0203FFFFFF', '0x0203010005', 'intervals', 'warning_oil_change'),
+        ('0x0203FFFFFF', '0x0203010006', 'intervals', 'alarm_inspection'),
+        ('0x0203FFFFFF', '0x0203010007', 'intervals', 'montly_mileage'),
+        ('0x0204FFFFFF', '0x02040C0001', 'intervals', 'ad_blue_range'),
+        ('0x0204FFFFFF', '0x0204040001', 'oil_level', 'liters'),
+        ('0x0204FFFFFF', '0x0204040002', 'oil_level', 'minimum_warning'),
+        ('0x0204FFFFFF', '0x0204040003', 'oil_level', 'dipstick_percentage'),
+        ('0x0204FFFFFF', '0x0204040004', 'oil_level', 'display'),
+        ('0x030101FFFF', '0x0301010001', 'status', 'parking_light'),
+        ('0x030103FFFF', '0x0301030005', 'status', 'total_range'),
+        ('0x030103FFFF', '0x030103000A', 'status', 'fuel_level'),
+        ('0x030103FFFF', '0x030103000D', 'status', 'cng_level'),
+        ('0x030104FFFF', '0x0301040001', 'doors', 'lock_left_front'),
+        ('0x030104FFFF', '0x0301040002', 'doors', 'open_left_front'),
+        ('0x030104FFFF', '0x0301040003', 'doors', 'safety_left_front'),
+        ('0x030104FFFF', '0x0301040004', 'doors', 'lock_left_rear'),
+        ('0x030104FFFF', '0x0301040005', 'doors', 'open_left_rear'),
+        ('0x030104FFFF', '0x0301040006', 'doors', 'safety_left_rear'),
+        ('0x030104FFFF', '0x0301040007', 'doors', 'lock_right_front'),
+        ('0x030104FFFF', '0x0301040008', 'doors', 'open_right_front'),
+        ('0x030104FFFF', '0x0301040009', 'doors', 'safety_right_front'),
+        ('0x030104FFFF', '0x030104000A', 'doors', 'lock_right_rear'),
+        ('0x030104FFFF', '0x030104000B', 'doors', 'open_right_rear'),
+        ('0x030104FFFF', '0x030104000C', 'doors', 'safety_right_rear'),
+        ('0x030104FFFF', '0x030104000D', 'doors', 'lock_trunk'),
+        ('0x030104FFFF', '0x030104000E', 'doors', 'open_trunk'),
+        ('0x030104FFFF', '0x030104000F', 'doors', 'safety_trunk'),
+        ('0x030104FFFF', '0x0301040010', 'doors', 'lock_hood'),
+        ('0x030104FFFF', '0x0301040011', 'doors', 'open_hood'),
+        ('0x030104FFFF', '0x0301040012', 'doors', 'safety_hood'),
+        ('0x030105FFFF', '0x0301050001', 'windows', 'state_left_front'),
+        ('0x030105FFFF', '0x0301050002', 'windows', 'position_left_front'),
+        ('0x030105FFFF', '0x0301050003', 'windows', 'state_left_rear'),
+        ('0x030105FFFF', '0x0301050004', 'windows', 'position_left_rear'),
+        ('0x030105FFFF', '0x0301050005', 'windows', 'state_right_front'),
+        ('0x030105FFFF', '0x0301050006', 'windows', 'position_right_front'),
+        ('0x030105FFFF', '0x0301050007', 'windows', 'state_right_rear'),
+        ('0x030105FFFF', '0x0301050008', 'windows', 'position_right_rear'),
+        ('0x030105FFFF', '0x0301050009', 'windows', 'state_convertible_top'),
+        ('0x030105FFFF', '0x030105000A', 'windows', 'position_convertible_top'),
+        ('0x030105FFFF', '0x030105000B', 'windows', 'state_roof'),
+        ('0x030105FFFF', '0x030105000C', 'windows', 'position_roof'),
+        ('0x030105FFFF', '0x030105000D', 'windows', 'state_roof_rear'),
+        ('0x030105FFFF', '0x030105000E', 'windows', 'position_roof_rear'),
+        ('0x030105FFFF', '0x030105000F', 'windows', 'state_service_flap'),
+        ('0x030105FFFF', '0x0301050010', 'windows', 'position_service_flap'),
+        ('0x030105FFFF', '0x0301050011', 'windows', 'state_spoiler'),
+        ('0x030105FFFF', '0x0301050012', 'windows', 'position_spoiler'),
+        ('0x0101010001', '0x0101010001', 'status', 'utc_time'),
+        ('0x0101010002', '0x0101010002', 'status', 'distance_covered'),
+        ('0x030103FFFF', '0x0301030001', 'status', 'parking_brake'),
+        ('0x030103FFFF', '0x0301030002', 'status', 'state_of_charge'),
+        ('0x030103FFFF', '0x0301030006', 'status', 'primary_range'),
+        ('0x030103FFFF', '0x0301030007', 'status', 'primary_drive'),
+        ('0x030103FFFF', '0x0301030008', 'status', 'secondary_range'),
+        ('0x030103FFFF', '0x0301030009', 'status', 'secondary_drive'),
+        ('0x030102FFFF', '0x0301020001', 'status', 'temperature_outside'),
+        
+        ]
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
         if (post == None and json == None):
@@ -627,7 +691,22 @@ class WeConnect():
         secure_token = self.__request_secure_token(vin, 'rlu_v1/operations/' + action.upper())
         r = self.__command('/bs/rlu/v1/VW/DE/vehicles/'+vin+'/actions', dashboard=self.BASE_URL, data=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb, content_type='application/vnd.vwg.mbb.RemoteLockUnlock_v1_0_0+xml', secure_token=secure_token)
         return r
-    
-    
+    '''
+    def parse_vsr(self, j):
+        r = []
+        if ('StoredVehicleDataResponse' in j):
+            j = j['StoredVehicleDataResponse']
+            r['VehicleDataResponse'] = []
+            rr = []
+            rr['vin'] = j['vin']
+            if ('vehicleData' in j and 'data' in j['vehicleData']):
+                for d in j['vehicleData']['data']:
+                    if ('id' in d and 'field' in d):
+                        for (f in d['field']):
+                            if (d['id'] == '0x0101010001'):
+                                rr['utc_time_status'] = f['value']
+                            elif (d['id'] == '0x0101010002'):
+                                rr['distance_covered'] = f['value']
+        '''        
         
         
