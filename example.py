@@ -9,7 +9,7 @@ COUNTRY_LANG = 'es_ES'
 USER = 'your_user'
 PASSWORD = 'your_password'
 
-from WeConnect import WeConnect
+from WebAPI import WeConnect
 
 vwc = WeConnect(COUNTRY_LANG)
 vwc.login(USER,PASSWORD)
