@@ -9,54 +9,90 @@ COUNTRY_LANG = 'es_ES'
 USER = 'your_user'
 PASSWORD = 'your_password'
 
-from WebAPI import WeConnect
+from NativeAPI import WeConnect
 
-vwc = WeConnect(COUNTRY_LANG)
-vwc.login(USER,PASSWORD)
-vehicles = vwc.search_vehicles()
-if (vehicles and len(vehicles) > 0):
-    print('Found {} vehicles'.format(len(vehicles)))
-    vin = vehicles[0]['vin']
-    tech = vwc.load_car_details(vin)
-    details = vwc.get_vehicle_details(vin)
-    print('---\nFetching information of {} (vin {})...'.format(vehicles[0]['vehicleName'], vin))
-    print('Model: {}'.format(tech['model']))
-    print('Year: {}'.format(tech['modelYear']))
-    print('Model code: {}'.format(tech['modelCode']))
-    print('Engine:')
-    print('\tCombustion: {}'.format(tech['engineTypeCombustian']))
-    print('\tElectric: {}'.format(tech['engineTypeElectric']))
-    print('\tHybrid: {}'.format(tech['engineTypeHybridOCU1'] or tech['engineTypeHybridOCU2']))
-    print('\tGNC: {}'.format(tech['engineTypeCNG']))
-    print('Mobile key activated: {}'.format(tech['mobileKeyActivated']))
-    print('eSIM compatible: {}'.format(tech['esimCompatible']))
-    print('Power layer: {}'.format(tech['vwConnectPowerLayerAvailable']))
-    print('Member since: {}'.format(details['enrollmentDate']))
-    print('Contracts:')
-    for c in tech['packageServices']:
-        print('\t{}, expires in {}'.format(c['packageServiceName'], c['expirationDate']))
-    lr = vwc.get_latest_report()[0]
-    print('Latest report')
-    print('\tDate: {} {}'.format(lr['creationDate'], lr['creationTime']))
-    print('\tMileage: {} km'.format(lr['mileageValue']))
-    print('\tNext service: {} (overdue {})'.format(details['serviceDates']['service'], lr['headerData']['serviceOverdue']))
-    print('\tNext oil: {} (overdue {})'.format(details['serviceDates']['oil'], lr['headerData']['oilOverdue']))
-    stat = vwc.get_latest_trip_statistics()
-    print('Latest trip statistics:')
-    for i in range(len(stat['tripStatistics'])-1,0,-1):
-        s = stat['tripStatistics'][i]
-        if (s):
-            t = s['tripStatistics'][-1]
-            print('\tDate: {} km'.format(t['timestamp']))
-            print('\tAverage speed: {} km/h'.format(t['averageSpeed']))
-            print('\tDuration: {} min'.format(t['tripDuration']))
-            print('\tDistance: {} km'.format(t['tripLength']))
-            if (t['averageFuelConsumption']):
-                print('\tAverage Fuel Consumption {} l'.format(t['averageFuelConsumption']))
-            if (t['averageElectricConsumption']):
-                print('\tAverage Electric Consumption {} kWh'.format(t['averageElectricConsumption']))
-            if (t['averageCngConsumption']):
-                print('\tAverage GNC Consumption {} kWh'.format(t['averageCngConsumption']))
-            break
-    
-    
+vwc = WeConnect(USER,PASSWORD)
+vwc.login()
+cars = vwc.get_real_car_data()
+profile = vwc.get_personal_data()
+print('Hi {} {} {} ({})!'.format(profile['salutation'], profile['firstName'], profile['lastName'], profile['nickname']))
+mbb = vwc.get_mbb_status()
+print('Profile completed?', mbb['profileCompleted'])
+print('S-PIN defined?', mbb['spinDefined'])
+print('CarNet enrollment country:',mbb['carnetEnrollmentCountry'])
+if (cars and len(cars)):
+    print('Enumerating cars...')
+    for car in cars['realCars']:
+        vin = car['vehicleIdentificationNumber']
+        print('\tNickname:', car['nickname'])
+        print('\tDealer:', car['allocatedDealerBrandCode'])
+        print('\tCarNet enrollment date:', car['carnetAllocationTimestamp'])
+        print('\tCarNet indicator:', car['carNetIndicator'])
+        print('\tDeactivated:', car['deactivated'])
+        if (car['deactivated'] == True):
+            print('\tDeactivation reason:',car['deactivationReason'])
+
+        print('---\nFetching information of {} (vin {})...\n---\n'.format(car['nickname'], vin))
+        details = vwc.get_vehicle_data(vin)
+        cardata = details['vehicleDataDetail']['carportData']
+        print('\tModel:' ,cardata['modelName'])
+        print('\tYear:', cardata['modelYear'])
+        print('\tModel code:', cardata['modelCode'])
+        print('\tEngine:', cardata['engine'])
+        print('\tMMI:', cardata['mmi'])
+        print('\tTransmission:', cardata['transmission'])
+        users = vwc.get_users(vin)
+        print('\tFound {} user(s) with access: {}'.format(len(users['users']), ', '.join([user['nickname'] for user in users['users']])))
+        #r = vwc.request_status_update(vin)
+        vsr = vwc.get_vsr(vin)
+        pvsr = vwc.parse_vsr(vsr)
+        print('\tStatus:')
+        status = pvsr['status']
+        print('\t\tDistance covered:', status['distance_covered'])
+        print('\t\tParking light:', status['parking_light'])
+        print('\t\tParking brake:', status['parking_brake'])
+        print('\t\tTemperature outside:', (int(status['temperature_outside'].split(' ')[0])-2731)/10)
+        print('\t\tBEM:', status['bem'])
+        print('\t\tSpeed:', status['speed'])
+        print('\t\tTotal range:', status['total_range'])
+        print('\t\tPrimary range:', status['primary_range'])
+        print('\t\tSecondary range:', status['secondary_range'])
+        print('\t\tFuel level:', status['fuel_level'])
+        print('\t\tCNG level:', status['cng_level'])
+        
+        print('\tIntervals:')
+        intv = pvsr['intervals']
+        print('\t\tDistance to oil change:', intv['distance_to_oil_change'])
+        print('\t\tDays to oil change:', intv['time_to_oil_change'])
+        print('\t\tDistance to inspection:', intv['distance_to_inspection'])
+        print('\t\tDays to inspection:', intv['time_to_inspection'])
+        print('\t\tAdBlue range:', intv['ad_blue_range'])
+        
+        print('\tOil level:')
+        oil = pvsr['oil_level']
+        print('\t\tLiters:', oil['liters'])
+        print('\t\tPercentage:', oil['dipstick_percentage'])
+        
+        print('\tDoors:')
+        doors = pvsr['doors']
+        avdoors = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear', 'trunk':'Trunk', 'hood':'Hood'}
+        for d in avdoors.items():
+            print('\t\t{}: {}, {}'.format(d[1], doors['open_'+d[0]], doors['lock_'+d[0]]))
+        
+        print('\tWindows:')
+        win = pvsr['windows']
+        avwin = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear'}
+        for d in avwin.items():
+            print('\t\t{}: {}, {}'.format(d[1], win['state_'+d[0]], win['position_'+d[0]]))
+        print('\t\tState roof:', win['state_roof'])
+        print('\t\tState roof rear:', win['state_roof_rear'])
+        print('\t\tState service flap:', win['state_service_flap'])
+        print('\t\tState spoiler:', win['state_spoiler'])
+        print('\t\tState convertible top:', win['state_convertible_top'])
+        
+        print('\tTyre pressure:')
+        tyre = pvsr['tyre_pressure']
+        avtyre = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear','spare':'Spare'}
+        for d in avtyre.items():
+            print('\t\t{}: {} (desired {}, diff {})'.format(d[1], tyre['current_'+d[0]], tyre['desired_'+d[0]], tyre['difference_'+d[0]]))
+        
