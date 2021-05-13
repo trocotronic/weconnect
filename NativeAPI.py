@@ -6,7 +6,7 @@ Created on Sun May 10 19:12:29 2020
 """
 import logging
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.WARN)
 
 class VWError(Exception):
     def __init__(self, message):
