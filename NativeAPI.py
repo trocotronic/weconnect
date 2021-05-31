@@ -611,6 +611,14 @@ class WeConnect():
         r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.__get_fal_url(vin), post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
+    def request_status(self, vin, reqId):
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests/'+reqId+'/jobstatus', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
+    def get_vsr_request(self, vin, reqId):
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests/'+reqId+'/status', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        return r
+    
     def __flash_and_honk(self, vin, mode, lat, long):
         data = {
             'honkAndFlashRequest': {
