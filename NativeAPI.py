@@ -499,6 +499,9 @@ class WeConnect():
         if ('fal3' not in self.__identities):
             self.__get_homeregion(vin)
         return self.__identities['fal3']
+    
+    def set_logging_level(self, level):
+        logging.getLogger().setLevel(level)
  
     def get_personal_data(self):
         r = self.__command('/personalData', dashboard=self.__identities['profile_url'])
