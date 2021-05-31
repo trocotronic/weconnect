@@ -218,6 +218,8 @@ class WeConnect():
                 logging.debug('Response error is not JSON format')
                 msg = "Error: status code {}".format(r.status_code)
             raise UrlError(r.status_code, msg, r)
+        #else:
+        #    print(r.content.decode())
         return r
     
     def __command(self, command, post=None, data=None, dashboard=None, accept='application/json', content_type=None, scope=None, secure_token=None):
@@ -429,6 +431,29 @@ class WeConnect():
             
             upr = urlparse(r.url)
             r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
+            if ('carnet://' not in r.history[-1].url):
+                logging.info('No carnet scheme found in response.')
+                soup = BeautifulSoup(r.text, 'html.parser')
+                metakits = soup.find_all("meta", {'name':'identitykit'})
+                print(metakits)
+                for metakit in metakits: 
+                    if (metakit['content'] == 'termsAndConditions'): #updated terms and conditions?
+                        logging.debug('Meta identitykit is termsandconditions')
+                        form = soup.find('form', {'id': 'emailPasswordForm'})
+                        if (form):
+                            if (not form.has_attr('action')):
+                                raise VWError('action not found in terms and conditions form. Cannot continue')
+                            form_url = form['action']
+                            logging.info('Found terms and conditions url: %s', form_url)
+                            hiddn = form.find_all('input', {'type': 'hidden'})
+                            post = {}
+                            for h in hiddn:
+                                post[h['name']] = h['value']
+                            upr = urlparse(r.url)
+                            r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
+                            logging.info('Successfully accepted updated terms and conditions')
+                        break
+                    
             self.__identities = get_url_params(r.history[-1].url)
             logging.info('Received Identities')
             logging.debug('Identities = %s', self.__identities)
