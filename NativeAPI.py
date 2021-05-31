@@ -333,10 +333,10 @@ class WeConnect():
                 logging.debug('OAuth %s still valid', scope)
                 return True
             logging.debug('OAUth %s expired. Refreshing', scope)
-            if ('sc2:fal' in self.__oauth and 'refresh_token' in self.__oauth['sc2:fal']):
+            if (scope in self.__oauth and 'refresh_token' in self.__oauth[scope]):
                 self.__refresh_oauth_scope(scope)
                 return True
-            logging.error('OAUTH sc2:fal not present. Cannot refresh')
+            logging.error('OAUTH {} not present. Cannot refresh'.format(scope))
         logging.debug('OAuth [%s] checking failed', scope)
         return False
     
