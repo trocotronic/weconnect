@@ -94,7 +94,7 @@ class WeConnect():
     __oauth = {}
     __accept_mbb = 'application/json, application/vnd.volkswagenag.com-error-v1+json, */*'
     __vsr_fields = [
-        ('0x0101010001', '0x0101010001', 'status', 'utc_time'),
+         ('0x0101010001', '0x0101010001', 'status', 'utc_time'),
         ('0x0101010002', '0x0101010002', 'status', 'distance_covered'),
         ('0x0203FFFFFF', '0x0203010001', 'intervals', 'distance_to_oil_change'),
         ('0x0203FFFFFF', '0x0203010002', 'intervals', 'time_to_oil_change'),
@@ -190,7 +190,6 @@ class WeConnect():
         ('0x030106000F', '0x030106000E', 'tyre_pressure', 'difference_right_rear'),
         ('0x030106000F', '0x030106000F', 'tyre_pressure', 'difference_spare'),
         
-        
         ]
     
     def __get_url(self, url,get=None,post=None,json=None,cookies=None,headers=None):
@@ -248,7 +247,7 @@ class WeConnect():
         headers = {
             'Authorization': 'Bearer '+scope['access_token'],
             'Accept': accept,
-            'X-App-Version': '5.3.2',
+            'X-App-Version': '5.8.0',
             'X-App-Name': 'We Connect',
             'Accept-Language': 'en-US',
             }
@@ -390,7 +389,7 @@ class WeConnect():
             soup = BeautifulSoup(r.text, 'html.parser')
             form = soup.find('form', {'id': 'emailPasswordForm'})
             if (not form):
-                raise VWError('Login form not 9found. Cannot continue')
+                raise VWError('Login form not found. Cannot continue')
             if (not form.has_attr('action')):
                 raise VWError('action not found in login email form. Cannot continue')
             form_url = form['action']
@@ -429,7 +428,7 @@ class WeConnect():
             post['password'] = self.__credentials['password']
             
             upr = urlparse(r.url)
-            r =  self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
+            r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
             self.__identities = get_url_params(r.history[-1].url)
             logging.info('Received Identities')
             logging.debug('Identities = %s', self.__identities)
@@ -453,7 +452,7 @@ class WeConnect():
                 data = {
                     "appId": "de.volkswagen.car-net.eu.e-remote",
                     "appName": "We Connect",
-                    "appVersion": "5.3.2",
+                    "appVersion": "5.8.0",
                     "client_brand": "VW",
                     "client_name": "iPhone",
                     "platform": "iOS"
@@ -488,6 +487,19 @@ class WeConnect():
             logging.info('Received business identity')
             logging.debug('Bussiness identity = %s', r['businessIdentifierValue'])
             self.__save_access()
+            
+    def __get_homeregion(self, vin):
+        r = self.__command('/cs/vds/v1/vehicles/'+vin+'/homeRegion', dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
+        self.__identities['mal3'] = r['homeRegion']['baseUri']['content']
+        upr = urlparse(self.__identities['mal3'])
+        self.__identities['fal3'] = upr.scheme+'://'+upr.netloc.replace('mal','fal')+'/fs-car'
+        logging.debug('fal3 URL = %s', self.__identities['fal3'])
+        logging.info('Received fal/mal Uri')
+        
+    def __get_fal_url(self, vin):
+        if ('fal3' not in self.__identities):
+            self.__get_homeregion(vin)
+        return self.__identities['fal3']
  
     def get_personal_data(self):
         r = self.__command('/personalData', dashboard=self.__identities['profile_url'])
@@ -511,7 +523,7 @@ class WeConnect():
     
     def get_vehicle_data(self, vin):
         __accept = 'application/vnd.vwg.mbb.vehicleDataDetail_v2_1_0+json, application/vnd.vwg.mbb.genericError_v1_0_2+json'
-        r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=__accept)
+        r = self.__command('/vehicleMgmt/vehicledata/v2/VW/DE/vehicles/'+vin, dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=__accept)
         return r
     
     def get_users(self, vin):
@@ -519,7 +531,7 @@ class WeConnect():
         return r
     
     def get_fences(self, vin):
-        r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/geofencing/v1/VW/DE/vehicles/'+vin+'/geofencingAlerts', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_fences_configuration(self):
@@ -527,7 +539,7 @@ class WeConnect():
         return r
     
     def get_speed_alerts(self, vin):
-        r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/speedalert/v1/VW/DE/vehicles/'+vin+'/speedAlerts', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_speed_alerts_configuration(self):
@@ -536,39 +548,39 @@ class WeConnect():
     
     def get_trip_data(self, vin, type='longTerm'):
         # type: 'longTerm', 'cyclic', 'shortTerm'
-        r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/tripstatistics/v1/VW/DE/vehicles/'+vin+'/tripdata/'+type+'?type=list', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_vsr(self, vin):
-        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_departure_timer(self, vin):
-        r = self.__command('/bs/departuretimer/v1/VW/DE/vehicles/'+vin+'/timer', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/departuretimer/v1/VW/DE/vehicles/'+vin+'/timer', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_climater(self, vin):
-        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_position(self, vin):
-        r = self.__command('/bs/cf/v1/VW/DE/vehicles/'+vin+'/position', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/cf/v1/VW/DE/vehicles/'+vin+'/position', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_destinations(self, vin):
-        r = self.__command('/destinationfeedservice/mydestinations/v1/VW/DE/vehicles/'+vin+'/destinations', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/destinationfeedservice/mydestinations/v1/VW/DE/vehicles/'+vin+'/destinations', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_charger(self, vin):
-        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_heating_status(self, vin):
-        r = self.__command('/bs/rs/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/rs/v1/VW/DE/vehicles/'+vin+'/status', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_history(self, vin):
-        r = self.__command('/bs/dwap/v1/VW/DE/vehicles/'+vin+'/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/dwap/v1/VW/DE/vehicles/'+vin+'/history', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_roles_rights(self, vin):
@@ -576,14 +588,14 @@ class WeConnect():
         return r
     
     def get_fetched_role(self, vin):
-        r = self.__command('/rolesrights/permissions/v1/VW/DE/vehicles/'+vin+'/fetched-role', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/rolesrights/permissions/v1/VW/DE/vehicles/'+vin+'/fetched-role', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_vehicle_health_report(self, vin):
         # DEPRECATED: this method is not reliable. It queries to far away GW sometimes it returns e504. The information returned is equivlent to get_vsr()
         # https://blog.vensis.pl/2019/11/vw-hacking/
         __accept = 'application/vnd.vwg.mbb.sharedTelemetricReport_v1_0_0+xml, application/vnd.vwg.mbb.genericError_v1_1_1+xml, */*'
-        r = self.__command('/vehiclehealthreport/myreports/v1/VW/DE/vehicles/'+vin+'/users/'+self.__identities['business_id']+'/vehicleHealthReports/history', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=__accept)
+        r = self.__command('/vehiclehealthreport/myreports/v1/VW/DE/vehicles/'+vin+'/users/'+self.__identities['business_id']+'/vehicleHealthReports/history', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=__accept)
         namespaces = {
             'http://www.vw.com/mbb/service_TelemetricSharedService_MBB': None,
             'http://xmldefs.volkswagenag.com/DD/MaintenanceEvent/V1': None,
@@ -593,11 +605,11 @@ class WeConnect():
     
     def get_car_port_data(self, vin):
         # It seems disabled. It returns e403 Forbidden
-        r = self.__command('/promoter/portfolio/v1/VW/DE/vehicle/'+vin+'/carportdata', dashboard=self.BASE_URL, accept=self.__accept_mbb, scope=self.__oauth['sc2:fal'])
+        r = self.__command('/promoter/portfolio/v1/VW/DE/vehicle/'+vin+'/carportdata', dashboard=self.__get_fal_url(vin), accept=self.__accept_mbb, scope=self.__oauth['sc2:fal'])
         return r
     
     def request_status_update(self, vin):
-        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.BASE_URL, post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/vsr/v1/VW/DE/vehicles/'+vin+'/requests', dashboard=self.__get_fal_url(vin), post={}, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def __flash_and_honk(self, vin, mode, lat, long):
@@ -611,7 +623,7 @@ class WeConnect():
                     }
                 }
             }
-        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash', dashboard=self.__get_fal_url(vin), post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def flash(self, vin, lat, long):
@@ -621,7 +633,7 @@ class WeConnect():
         return self.__flash_and_honk(vin, 'HONK_AND_FLASH', lat, long)
     
     def get_honk_and_flash_status(self, vin, rid):
-        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash/'+str(rid)+'/status', dashboard=self.BASE_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/rhf/v1/VW/DE/vehicles/'+vin+'/honkAndFlash/'+str(rid)+'/status', dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_honk_and_flash_configuration(self):
@@ -635,7 +647,7 @@ class WeConnect():
                 }
                 
             }
-        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/batterycharge/v1/VW/DE/vehicles/'+vin+'/charger/actions', dashboard=self.__get_fal_url(vin), post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def climatisation(self, vin, action='off'):
@@ -645,7 +657,7 @@ class WeConnect():
                 }
                 
             }
-        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.__get_fal_url(vin), post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def climatisation_temperature(self, vin, temperature=21.5):
@@ -661,7 +673,7 @@ class WeConnect():
                 }
                 
             }
-        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.__get_fal_url(vin), post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def window_melt(self, vin, action='off'):
@@ -671,7 +683,7 @@ class WeConnect():
                 }
                 
             }
-        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.BASE_URL, post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/bs/climatisation/v1/VW/DE/vehicles/'+vin+'/climater/actions', dashboard=self.__get_fal_url(vin), post=data, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def __generate_secure_pin(self, challenge):
