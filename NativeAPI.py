@@ -4,6 +4,7 @@ Created on Sun May 10 19:12:29 2020
 
 @author: Trocotronic
 """
+import _version
 import logging
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logging.getLogger().setLevel(logging.WARN)
@@ -502,6 +503,9 @@ class WeConnect():
     
     def set_logging_level(self, level):
         logging.getLogger().setLevel(level)
+        
+    def version(self):
+        return _version.__version__
  
     def get_personal_data(self):
         r = self.__command('/personalData', dashboard=self.__identities['profile_url'])
