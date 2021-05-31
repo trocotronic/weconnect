@@ -529,7 +529,7 @@ class WeConnect():
         return r
     
     def get_users(self, vin):
-        r = self.__command('/uic/v1/vin/'+vin+'/users', dashboard=self.USER_URL, post={'idP_IT': self.__identity_kit['id_token']})
+        r = self.__command('/uic/v1/vin/'+vin+'/users', dashboard=self.USER_URL, post={'idP_IT': self.__tokens['id_token']})
         return r
     
     def get_fences(self, vin):
