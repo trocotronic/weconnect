@@ -526,6 +526,11 @@ class WeConnect():
             self.__get_homeregion(vin)
         return self.__identities['fal3']
     
+    def __get_mal_url(self, vin):
+        if ('mal3' not in self.__identities):
+            self.__get_homeregion(vin)
+        return self.__identities['mal3']
+    
     def set_logging_level(self, level):
         logging.getLogger().setLevel(level)
         
@@ -615,7 +620,7 @@ class WeConnect():
         return r
     
     def get_roles_rights(self, vin):
-        r = self.__command('/rolesrights/operationlist/v3/vehicles/'+vin+'/users/'+self.__identities['business_id'], dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
+        r = self.__command('/rolesrights/operationlist/v3/vehicles/'+vin+'/users/'+self.__identities['business_id'], dashboard=self.__get_fal_url(vin), scope=self.__oauth['sc2:fal'], accept=self.__accept_mbb)
         return r
     
     def get_fetched_role(self, vin):
