@@ -123,7 +123,7 @@ class VSR:
                         for f in d['field']:
                             found = False
                             for e in self.__vsr_fields:
-                                if (e[0] == d['id'] and e[1] == f['id']):
+                                if (e[1] == f['id']):
                                     if (e[2] not in rr):
                                         rr[e[2]] = {}
                                     rr[e[2]][e[3]] = 'null'
