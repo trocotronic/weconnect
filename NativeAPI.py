@@ -6,6 +6,7 @@ Created on Sun May 10 19:12:29 2020
 """
 import _version
 import logging
+import credentials
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logging.getLogger().setLevel(logging.WARN)
 
@@ -263,10 +264,10 @@ class WeConnect():
             return jr
         return r
     
-    def __init__(self, user, password, spin=None):
+    def __init__(self, spin=None):
         self.__session = requests.Session()
-        self.__credentials['user'] = user
-        self.__credentials['password'] = password
+        self.__credentials['user'] = credentials.username
+        self.__credentials['password'] = credentials.password
         self.__credentials['spin'] = None
         if (spin):
             if (isinstance(spin, int)):
@@ -453,6 +454,10 @@ class WeConnect():
                             r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
                             logging.info('Successfully accepted updated terms and conditions')
                         break
+                    elif (metakit['content'] == 'loginAuthenticate'):
+                        logging.warn('Meta identitykit is loginAuthenticate')
+                        if ('error' in r.url):
+                            raise VWError(r.url.split('error=')[1])
                     
             self.__identities = get_url_params(r.history[-1].url)
             logging.info('Received Identities')
