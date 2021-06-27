@@ -3,6 +3,7 @@ API for Python to interact with Volkswagen's service We Connect (formerly CarNet
 
 ## Information
 This modules contains some of the methods to interact with Volkswagen's service We Connect. This API is made for Python and retrieves the information in JSON format. It can be imported into your application and interact with VW's servers directly.
+Edit `credentials.py` to specify your username (e-mail) and password.
 
 ## Features
 - Direct login with the same USER and PASSWORD you use.
@@ -29,6 +30,7 @@ This modules contains some of the methods to interact with Volkswagen's service 
   - get_trusted_device_status
 
 ## Usage
+See `example.py`.
 
 ## License
 Under ODC Open Database License v1.0.
