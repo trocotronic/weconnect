@@ -521,8 +521,11 @@ class WeConnect():
     def __get_homeregion(self, vin):
         r = self.__command('/cs/vds/v1/vehicles/'+vin+'/homeRegion', dashboard=self.MAL_URL, scope=self.__oauth['sc2:fal'])
         self.__identities['mal3'] = r['homeRegion']['baseUri']['content']
-        upr = urlparse(self.__identities['mal3'])
-        self.__identities['fal3'] = upr.scheme+'://'+upr.netloc.replace('mal','fal')+'/fs-car'
+        if ('mal-1a' in self.__identities['mal3']):
+            self.__identities['fal3'] = self.BASE_URL
+        else:
+            upr = urlparse(self.__identities['mal3'])
+            self.__identities['fal3'] = upr.scheme+'://'+upr.netloc.replace('mal','fal')+'/fs-car'
         logging.debug('fal3 URL = %s', self.__identities['fal3'])
         logging.info('Received fal/mal Uri')
         
