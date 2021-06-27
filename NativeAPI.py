@@ -431,7 +431,7 @@ class WeConnect():
             
             upr = urlparse(r.url)
             r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
-            if ('carnet://' not in r.history[-1].url):
+            if ('carnet://' not in r.url):
                 logging.info('No carnet scheme found in response.')
                 soup = BeautifulSoup(r.text, 'html.parser')
                 metakits = soup.find_all("meta", {'name':'identitykit'})
