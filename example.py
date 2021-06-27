@@ -7,9 +7,9 @@ Created on Fri May  8 14:06:16 2020
 
 from NativeAPI import WeConnect
 import logging
+
 logging.getLogger().setLevel(logging.WARN)
 vwc = WeConnect()
-
 vwc.login()
 cars = vwc.get_real_car_data()
 profile = vwc.get_personal_data()
