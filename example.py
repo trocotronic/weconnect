@@ -7,6 +7,7 @@ Created on Fri May  8 14:06:16 2020
 
 from NativeAPI import WeConnect
 import logging
+import requests
 
 logging.getLogger().setLevel(logging.WARN)
 vwc = WeConnect()
@@ -93,4 +94,10 @@ if (cars and len(cars)):
         avtyre = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear','spare':'Spare'}
         for d in avtyre.items():
             print('\t\t{}: {} (desired {}, diff {})'.format(d[1], tyre['current_'+d[0]], tyre['desired_'+d[0]], tyre['difference_'+d[0]]))
-        
+        pos = vwc.get_position(vin)
+        latlong = pos['storedPositionResponse']['position']['carCoordinate']
+        data = requests.get('https://nominatim.openstreetmap.org/search.php?q='+str(latlong['latitude']/1e6)+','+str(latlong['longitude']/1e6)+'&polygon_geojson=1&format=jsonv2')
+        j = data.json()
+        if (len(j) > 0):
+            print('\tLocation: '+j[0]['display_name'])
+            
