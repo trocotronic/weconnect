@@ -169,22 +169,22 @@ class WeConnect():
             return jr
         return r
     
-    def __init__(self, spin=None):
+    def __init__(self):
         self.__session = requests.Session()
         self.__credentials['user'] = credentials.username
         self.__credentials['password'] = credentials.password
         self.__credentials['spin'] = None
-        if (spin):
-            if (isinstance(spin, int)):
-                spin = str(spin).zfill(4)
-            if (isinstance(spin, str)):
-                if (len(spin) != 4):
+        if (hasattr(credentials,'spin') and credentials.spin is not None):
+            if (isinstance(credentials.spin, int)):
+                credentials.spin = str(credentials.spin).zfill(4)
+            if (isinstance(credentials.spin, str)):
+                if (len(credentials.spin) != 4):
                     raise VWError('Wrong S-PIN format: must be 4-digits')
                 try:
-                    d = int(spin)
+                    d = int(credentials.spin)
                 except ValueError:
                     raise VWError('Wrong S-PIN format: must be 4-digits')
-                self.__credentials['spin'] = spin
+                self.__credentials['spin'] = credentials.spin
             else:
                 raise VWError('Wrong S-PIN format: must be 4-digits')
         
