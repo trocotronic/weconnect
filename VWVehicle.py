@@ -8,10 +8,21 @@ Created on Thu Jul 15 18:03:20 2021
 
 import NativeAPI
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+import configparser
+import json
 
 logger = logging.getLogger('VWVehicle')
 logger.setLevel(logging.getLogger().level)
+
+def load_datetime(s):
+    return datetime.fromisoformat(s.replace('Z','+00:00')).replace(tzinfo=None)
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime,)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 class VWVehicle:
     __api = None
@@ -30,11 +41,16 @@ class VWVehicle:
         'rbatterycharge_v1': { 'status': False }
         }
     
-    def __init__(self,vin=None):
-        self.__vin = vin
+    def __init__(self,fileconf = 'vehicle.conf'):
+        self.__parse_conf(fileconf)
         self.__api = NativeAPI.WeConnect()
         self.__api.login()
         self.__discover()
+        
+    def __parse_conf(self, fileconf):
+        self.__config = configparser.ConfigParser()
+        self.__config.read(fileconf)
+        self.__vin = self.__config.get('general','vin',fallback=None)
         
     def set_logging_level(self, level):
         loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
@@ -85,12 +101,11 @@ class VWVehicle:
                     if (self.__supported_services[service_name]['expiration']):
                         logger.info('Service {} set expiration to {}'.format(service_name,self.__supported_services[service_name]['expiration']))
                     self.__supported_services[service_name]['operations'] = [op.get('id','NO_ID') for op in service.get('operation', [])]
-        
+    
     def __check_access(self,service_name):
         if (self.__supported_services.get(service_name,{}).get('status',False)):
             now = datetime.utcnow()
-            expiration = datetime.fromisoformat(self.__supported_services[service_name].get('expiration',(now+timedelta(weeks=1)).isoformat()).replace('Z','+00:00')).replace(tzinfo=None)
-            print(now,expiration)
+            expiration = load_datetime(self.__supported_services[service_name].get('expiration',(now+timedelta(weeks=1)).isoformat()))
             if (now >= expiration):
                 logger.warning('Calling expired service {} (expired on {})'.format(service_name,expiration))
             return now < expiration
@@ -99,4 +114,25 @@ class VWVehicle:
     def get_position(self):
         if (self.__check_access('carfinder_v1')):
             pos = self.__api.get_position(self.__vin)
+            logger.info('Received position')
+            if (self.__config.getboolean('position','record',fallback=False)):
+                posfile = self.__config.get('position','file',fallback='position.history')
+                logger.info('Recording position to {}'.format(posfile))
+                try:
+                    with open(posfile) as json_file:
+                        data = json.load(json_file)
+                    logger.debug('Found position file')
+                except (FileNotFoundError,json.decoder.JSONDecodeError):
+                    data = []
+                    logger.debug('Position file not found')
+                parking = load_datetime(pos.get('storedPositionResponse',{}).get('parkingTimeUTC','1970-01-01T00:00:00Z'))
+                if (len(data) == 0 or load_datetime(data[-1]['timestamp']) < parking):
+                    logger.debug('Updating record history with new timestamp {}'.format(parking))
+                    coords = pos.get('storedPositionResponse',{}).get('position',{}).get('carCoordinate',{})
+                    data.append({'timestamp': parking, 'coordinates': {'latitude': coords.get('latitude',0), 'longitude': coords.get('longitude')}})
+                    with open(self.__config.get('position','file',fallback='position.history'),'w') as json_file:
+                        json.dump(data, json_file, default=json_serial)
+                    logger.debug('Record history updated')
+                elif (load_datetime(data[-1]['timestamp']) >= parking):
+                    logger.debug('No new records found. Record history not updated')
             return pos
