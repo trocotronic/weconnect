@@ -336,7 +336,6 @@ class WeConnect():
                 logger.info('No carnet scheme found in response.')
                 soup = BeautifulSoup(r.text, 'html.parser')
                 metakits = soup.find_all("meta", {'name':'identitykit'})
-                print(metakits)
                 for metakit in metakits: 
                     if (metakit['content'] == 'termsAndConditions'): #updated terms and conditions?
                         logger.debug('Meta identitykit is termsandconditions')
