@@ -27,7 +27,7 @@ class UrlError(VWError):
         super().__init__(message)
     pass
 
-import requests, pickle, hashlib, base64, os, random, time, json, xmltodict
+import requests, pickle, hashlib, base64, os, random, time, json, xmltodict, re
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, unquote_plus
 
@@ -316,32 +316,22 @@ class WeConnect():
             upr = urlparse(r.url)
             r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
             soup = BeautifulSoup(r.text, 'html.parser')
-            form = soup.find('form', {'id': 'credentialsForm'})
-            if (not form):
-                form = soup.find('form', {'id': 'emailPasswordForm'})
-                if (form):
-                    span = form.find('span', { 'class': 'message'})
-                    e = 'Cannot login. Unknown error.'
-                    if (span):
-                        e = span.text
-                    else:
-                        div = form.find('div', {'class': 'sub-title'})
-                        if (div):
-                            e = div.text
-                    raise VWError(e)
-                raise VWError('This account does not exist')
-            if (not form.has_attr('action')):
-                raise VWError('action not found in login password form. Cannot continue')
-            form_url = form['action']
-            logger.info('Found password login url: %s', form_url)
-            hiddn = form.find_all('input', {'type': 'hidden'})
-            post = {}
-            for h in hiddn:
-                post[h['name']] = h['value']
+            scripts = soup.find_all('script')
+            for script in scripts:
+                if script.string and 'window._IDK' in script.string:
+                    try:
+                        idk_txt = '{'+re.search(r'\{(.*)\}',script.string,re.M|re.S).group(1)+'}'
+                        idk_txt = re.sub(r'([\{\s,])(\w+)(:)', r'\1"\2"\3', idk_txt.replace('\'','"'))
+                        idk = json.loads(idk_txt)
+                        break
+                    except json.decoder.JSONDecodeError:
+                        raise VWError('Cannot find IDK credentials')
+
+            post['hmac'] = idk['templateModel']['hmac']
             post['password'] = self.__credentials['password']
             
             upr = urlparse(r.url)
-            r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url, post=post)
+            r = self.__get_url(upr.scheme+'://'+upr.netloc+form_url.replace(idk['templateModel']['identifierUrl'],idk['templateModel']['postAction']), post=post)
             if ('carnet://' not in r.url):
                 logger.info('No carnet scheme found in response.')
                 soup = BeautifulSoup(r.text, 'html.parser')
