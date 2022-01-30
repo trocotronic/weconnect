@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 import configparser
 import json
+import sys
 
 logger = logging.getLogger('VWVehicle')
 logger.setLevel(logging.getLogger().level)
@@ -64,7 +65,7 @@ class VWVehicle:
         realcars = self.__api.get_real_car_data().get('realCars',[])
         if (len(realcars) == 0):
             logger.critical('No cars found. Cannot continue.')
-            exit(-1)
+            sys.exit(-1)
         if (len(realcars) == 1 and self.__vin is None):
             self.__vin = realcars[0].get('vehicleIdentificationNumber','NO_VIN')
             self.__cardata = realcars[0]
@@ -78,10 +79,10 @@ class VWVehicle:
                 logger.info('Found car with VIN {}'.format(self.__vin))
             else:
                 logger.critical('No car found with VIN {}. Cannot continue.'.format(self.__vin))
-                exit(-1)
+                sys.exit(-1)
         if (self.__cardata.get('deactivated',False)):
             logger.critical('Car {} is deactivated: {}.\nCannot continue.'.format(self.__vin, self.__cardata.get('deactivationReason','NO_REASON')))
-            exit(-1)
+            sys.exit(-1)
         self.__nickname = self.__cardata.get('nickname','NO_NAME')
         logger.info('Discovering services for vehicle {} ({})'.format(self.__nickname, self.__vin))
         self.__vehicledata = self.__api.get_vehicle_data(self.__vin)
