@@ -293,7 +293,6 @@ class WeConnect():
     def __parse_market_consent(self, r):
         soup = BeautifulSoup(r.text, 'html.parser')
         upr = urlparse(r.url)
-        print(upr)
         qs = parse_qs(upr.query)
         idk = self.__get_idk(soup)
         ix = 0
@@ -311,7 +310,6 @@ class WeConnect():
             for idx, mkt in enumerate(idk['templateModel']['marketChannels']):
                 post[f'channel{mkt["channelId"]}'] = False
 
-            print(post)
             r = self.__get_url(f'{upr.scheme}://{upr.netloc}{"/".join(upr.path.split("/")[:-1])}/{str(ix)}/skip', post=post)
             if ('carnet://' in r.url):
                 break
