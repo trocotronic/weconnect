@@ -5,11 +5,12 @@ Created on Fri May  8 14:06:16 2020
 @author: Trocotronic
 """
 
-from NativeAPI import WeConnect
 import logging
+logging.getLogger().setLevel(logging.WARN)
+
+from NativeAPI import WeConnect
 import requests
 
-logging.getLogger().setLevel(logging.WARN)
 vwc = WeConnect()
 vwc.login()
 cars = vwc.get_real_car_data()
@@ -58,7 +59,7 @@ if (cars and len(cars)):
         print('\t\tSecondary range:', status.get('secondary_range','UNKNOWN'))
         print('\t\tFuel level:', status.get('fuel_level','UNKNOWN'))
         print('\t\tCNG level:', status.get('cng_level','UNKNOWN'))
-        
+
         print('\tIntervals:')
         intv = pvsr.get('intervals',[])
         print('\t\tDistance to oil change:', intv.get('distance_to_oil_change','UNKNOWN'))
@@ -66,18 +67,18 @@ if (cars and len(cars)):
         print('\t\tDistance to inspection:', intv.get('distance_to_inspection','UNKNOWN'))
         print('\t\tDays to inspection:', intv.get('time_to_inspection','UNKNOWN'))
         print('\t\tAdBlue range:', intv.get('ad_blue_range','UNKNOWN'))
-        
+
         print('\tOil level:')
         oil = pvsr.get('oil_level',[])
         print('\t\tLiters:', oil.get('liters','UNKNOWN'))
         print('\t\tPercentage:', oil.get('dipstick_percentage','UNKNOWN'))
-        
+
         print('\tDoors:')
         doors = pvsr.get('doors',[])
         avdoors = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear', 'trunk':'Trunk', 'hood':'Hood'}
         for d in avdoors.items():
             print('\t\t{}: {}, {}'.format(d[1], doors.get('open_'+d[0],''), doors.get('lock_'+d[0],'')))
-        
+
         print('\tWindows:')
         win = pvsr.get('windows',[])
         avwin = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear'}
@@ -88,7 +89,7 @@ if (cars and len(cars)):
         print('\t\tState service flap:', win.get('state_service_flap','UNKNOWN'))
         print('\t\tState spoiler:', win.get('state_spoiler','UNKNOWN'))
         print('\t\tState convertible top:', win.get('state_convertible_top','UNKNOWN'))
-        
+
         print('\tTyre pressure:')
         tyre = pvsr.get('tyre_pressure',[])
         avtyre = {'left_front':'Left front', 'right_front':'Right front', 'left_rear':'Left rear', 'right_rear':'Right rear','spare':'Spare'}
@@ -100,4 +101,3 @@ if (cars and len(cars)):
         j = data.json()
         if (len(j) > 0):
             print('\tLocation: '+j[0]['display_name'])
-            
