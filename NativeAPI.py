@@ -91,7 +91,7 @@ class WeConnect():
     ACCESS_FILE = 'weconnectAPI.access'
     BASE_URL = 'https://msg.volkswagen.de/fs-car'
     TOKEN_URL = 'https://tokenrefreshservice.apps.emea.vwapps.io'
-    PROFILE_URL = 'https://customer-profile.apps.emea.vwapps.io/v1/customers/{}'
+    PROFILE_URL = 'https://customer-profile.vwgroup.io/v1/customers/{}'
     OAUTH_URL = 'https://mbboauth-1d.prd.ece.vwg-connect.com/mbbcoauth/mobile/oauth2/v1/token'
     USER_URL = 'https://userinformationservice.apps.emea.vwapps.io/iaa'
     MAL_URL = 'https://mal-1a.prd.ece.vwg-connect.com/api'
@@ -265,11 +265,9 @@ class WeConnect():
         scripts = soup.find_all('script')
         for script in scripts:
             if script.string and 'window._IDK' in script.string:
-                print(script.string)
                 try:
                     idk_txt = '{'+re.search(r'\{(.*)\}',script.string,re.M|re.S).group(1)+'}'
                     idk_txt = re.sub(r'([\{\s,])(\w+)(:)', r'\1"\2"\3', idk_txt.replace('\'','"'))
-                    print(idk_txt)
                     idk = yaml.load(idk_txt, Loader=yaml.FullLoader)
                     return idk
                 except json.decoder.JSONDecodeError:
